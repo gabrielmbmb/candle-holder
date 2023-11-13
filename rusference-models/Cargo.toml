@@ -1,5 +1,5 @@
 [package]
-name = "rusference-model"
+name = "rusference-models"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,10 +7,10 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.75"
-candle-core = { version = "0.3.1", features = ["metal"] }
+candle-core = { version = "0.3.1", features = [] }
 candle-nn = "0.3.1"
 candle-transformers = "0.3.1"
 hf-hub = "0.3.2"
-serde = "1.0.192"
+serde = { version = "1.0.192", features = ["derive"] }
 serde_json = "1.0.108"
 tokenizers = "0.14.1"

@@ -1,2 +1,2 @@
 [workspace]
-members = ["rusference-api", "rusference-model"]
+members = ["rusference-api", "rusference-models"]

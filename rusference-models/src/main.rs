@@ -1,25 +1,19 @@
 use std::time::Instant;
 
 use anyhow::{Error, Result};
-use candle_core::{utils::metal_is_available, Device, Tensor};
+use candle_core::{Device, Tensor};
 use candle_nn::VarBuilder;
-use candle_transformers::models::bert::{BertModel, Config, DTYPE};
+use candle_transformers::models::bert::DTYPE;
 use hf_hub::{api::sync::Api, Repo, RepoType};
-use tokenizers::Tokenizer;
+use rusference_models::models::bert::{BertConfig, BertForSequenceClassification};
+// use tokenizers::Tokenizer;
+use tokenizers::tokenizer::Tokenizer;
 
-fn device(cpu: bool) -> Result<Device> {
-    if cpu {
-        Ok(Device::Cpu)
-    } else if metal_is_available() {
-        Ok(Device::new_metal(0)?)
-    } else {
-        Ok(Device::Cpu)
-    }
-}
-
-fn build_model_and_tokenizer(device: &Device) -> Result<(BertModel, Tokenizer)> {
+fn build_model_and_tokenizer(
+    device: &Device,
+) -> Result<(BertForSequenceClassification, Tokenizer)> {
     let repo = Repo::with_revision(
-        "sentence-transformers/all-MiniLM-L6-v2".into(),
+        "bhadresh-savani/bert-base-uncased-emotion".into(),
         RepoType::Model,
         "main".into(),
     );
@@ -33,17 +27,17 @@ fn build_model_and_tokenizer(device: &Device) -> Result<(BertModel, Tokenizer)> 
     };
 
     let config = std::fs::read_to_string(config_filename)?;
-    let config: Config = serde_json::from_str(&config)?;
+    let config: BertConfig = serde_json::from_str(&config)?;
     let tokenizer = Tokenizer::from_file(tokenizer_filename).map_err(Error::msg)?;
 
-    let vb = VarBuilder::from_pth(&weights_filename, DTYPE, &device)?;
-    let model = BertModel::load(vb, &config)?;
+    let vb = VarBuilder::from_pth(&weights_filename, DTYPE, device)?;
+    let model = BertForSequenceClassification::load(vb, &config)?;
     Ok((model, tokenizer))
 }
 
 fn main() -> Result<()> {
-    let device = device(false)?;
-    print!("Device: {:?} ", device);
+    let device = Device::Cpu;
+    println!("Device: {:?} ", device);
     let (model, tokenizer) = build_model_and_tokenizer(&device)?;
     let tokens = tokenizer
         .encode("What's up?", true)
@@ -51,6 +45,7 @@ fn main() -> Result<()> {
         .get_ids()
         .to_vec();
     let token_ids = Tensor::new(&tokens[..], &device)?.unsqueeze(0)?;
+    println!("Token ids: {}", token_ids);
     let token_type_ids = token_ids.zeros_like()?;
 
     let start = Instant::now();
