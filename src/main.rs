@@ -2,10 +2,10 @@ use std::time::Instant;
 
 use anyhow::{Error, Result};
 use candle_core::{Device, Tensor};
+use candle_holder::models::bert::{BertConfig, BertForSequenceClassification};
 use candle_nn::VarBuilder;
 use candle_transformers::models::bert::DTYPE;
 use hf_hub::{api::sync::Api, Repo, RepoType};
-use rusference_models::models::bert::{BertConfig, BertForSequenceClassification};
 // use tokenizers::Tokenizer;
 use tokenizers::tokenizer::Tokenizer;
 
@@ -49,12 +49,7 @@ fn main() -> Result<()> {
     let token_type_ids = token_ids.zeros_like()?;
 
     let start = Instant::now();
-    for idx in 0..5 {
-        let ys = model.forward(&token_ids, &token_type_ids)?;
-        if idx == 0 {
-            println!("{ys}");
-        }
-    }
+    let ys = model.forward(&token_ids, &token_type_ids)?;
     println!("Took: {:?}", start.elapsed());
     Ok(())
 }

@@ -23,10 +23,10 @@ impl HiddenActLayer {
         Self { act }
     }
 
-    fn forward(&self, xs: &Tensor) -> candle_core::Result<Tensor> {
+    fn forward(&self, hidden_states: &Tensor) -> candle_core::Result<Tensor> {
         match self.act {
-            HiddenAct::Gelu => xs.gelu(),
-            HiddenAct::Relu => xs.relu(),
+            HiddenAct::Gelu => hidden_states.gelu(),
+            HiddenAct::Relu => hidden_states.relu(),
         }
     }
 }
@@ -285,8 +285,8 @@ impl BertIntermediate {
 }
 
 impl Module for BertIntermediate {
-    fn forward(&self, xs: &Tensor) -> candle_core::Result<Tensor> {
-        let hidden_states = self.dense.forward(xs)?;
+    fn forward(&self, hidden_states: &Tensor) -> candle_core::Result<Tensor> {
+        let hidden_states = self.dense.forward(hidden_states)?;
         let ys = self.intermediate_act.forward(&hidden_states)?;
         Ok(ys)
     }
