@@ -1,11 +1,14 @@
 use std::collections::HashMap;
 
+use super::factories::PreTrainedModel;
 use anyhow::Result;
-use candle_core::{IndexOp, Module, Tensor};
+use candle_core::{DType, IndexOp, Module, Tensor};
 use candle_nn::{
     embedding, layer_norm, linear, ops::softmax, Dropout, Embedding, LayerNorm, Linear, VarBuilder,
 };
 use serde::Deserialize;
+
+pub const BERT_DTYPE: DType = DType::F32;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -25,7 +28,7 @@ impl HiddenActLayer {
 
     fn forward(&self, hidden_states: &Tensor) -> candle_core::Result<Tensor> {
         match self.act {
-            HiddenAct::Gelu => hidden_states.gelu(),
+            HiddenAct::Gelu => hidden_states.gelu_erf(),
             HiddenAct::Relu => hidden_states.relu(),
         }
     }
@@ -97,11 +100,11 @@ impl Default for BertConfig {
 }
 
 pub struct BertEmbeddings {
-    word_embeddings: Embedding,
-    position_embeddings: Option<Embedding>,
-    token_type_embeddings: Embedding,
-    layer_norm: LayerNorm,
-    dropout: Dropout,
+    pub word_embeddings: Embedding,
+    pub position_embeddings: Option<Embedding>,
+    pub token_type_embeddings: Embedding,
+    pub layer_norm: LayerNorm,
+    pub dropout: Dropout,
 }
 
 impl BertEmbeddings {
@@ -192,20 +195,20 @@ impl BertSelfAttention {
 
 impl Module for BertSelfAttention {
     fn forward(&self, hidden_states: &Tensor) -> candle_core::Result<Tensor> {
-        let q = self.query.forward(hidden_states)?;
-        let k = self.key.forward(hidden_states)?;
-        let v = self.value.forward(hidden_states)?;
+        let query_layer = self.query.forward(hidden_states)?;
+        let key_layer = self.key.forward(hidden_states)?;
+        let value_layer = self.value.forward(hidden_states)?;
 
-        let q = self.transpose_for_scores(&q)?;
-        let k = self.transpose_for_scores(&k)?;
-        let v = self.transpose_for_scores(&v)?;
+        let query_layer = self.transpose_for_scores(&query_layer)?;
+        let key_layer = self.transpose_for_scores(&key_layer)?;
+        let value_layer = self.transpose_for_scores(&value_layer)?;
 
-        let attention_scores = q.matmul(&k.t()?)?;
+        let attention_scores = query_layer.matmul(&key_layer.t()?)?;
         let attention_scores = (attention_scores / (self.attention_head_size as f64).sqrt())?;
         let attention_probs = softmax(&attention_scores, candle_core::D::Minus1)?;
         let attention_probs = self.dropout.forward(&attention_probs, false)?;
 
-        let context_layer = attention_probs.matmul(&v)?;
+        let context_layer = attention_probs.matmul(&value_layer)?;
         let context_layer = context_layer.transpose(1, 2)?.contiguous()?;
         let context_layer = context_layer.flatten_from(candle_core::D::Minus2)?;
         Ok(context_layer)
@@ -423,21 +426,40 @@ impl BertModel {
     }
 }
 
+pub struct PreTrainedBertModel {
+    model: BertModel,
+}
+
+impl PreTrainedModel for PreTrainedBertModel {
+    fn load(vb: VarBuilder, config: serde_json::Value) -> Result<Self> {
+        let config: BertConfig = serde_json::from_value(config)?;
+        let model = BertModel::load(vb.pp("bert"), &config)?;
+        Ok(Self { model })
+    }
+
+    fn forward(&self, input_ids: &Tensor, token_type_ids: &Tensor) -> Result<Tensor> {
+        self.model.forward(input_ids, token_type_ids)
+    }
+}
+
 pub struct BertForSequenceClassification {
-    bert: BertModel,
+    model: BertModel,
     classifier: Linear,
 }
 
-impl BertForSequenceClassification {
-    pub fn load(vb: VarBuilder, config: &BertConfig) -> Result<Self> {
-        let classifier = linear(config.hidden_size, config.num_labels(), vb.pp("classifier"))?;
-        let bert = BertModel::load(vb.pp("bert"), config)?;
+impl BertForSequenceClassification {}
 
-        Ok(Self { bert, classifier })
+impl PreTrainedModel for BertForSequenceClassification {
+    fn load(vb: VarBuilder, config: serde_json::Value) -> Result<Self> {
+        let config: BertConfig = serde_json::from_value(config)?;
+        let model = BertModel::load(vb.pp("bert"), &config)?;
+        let classifier = linear(config.hidden_size, config.num_labels(), vb.pp("classifier"))?;
+
+        Ok(Self { model, classifier })
     }
 
-    pub fn forward(&self, input_ids: &Tensor, token_type_ids: &Tensor) -> Result<Tensor> {
-        let pooled_output = self.bert.forward(input_ids, token_type_ids)?;
+    fn forward(&self, input_ids: &Tensor, token_type_ids: &Tensor) -> Result<Tensor> {
+        let pooled_output = self.model.forward(input_ids, token_type_ids)?;
         let logits = self.classifier.forward(&pooled_output)?;
         Ok(logits)
     }
