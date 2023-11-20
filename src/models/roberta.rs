@@ -1,4 +1,4 @@
-use super::factories::PreTrainedModel;
+use crate::model_factories::PreTrainedModel;
 use anyhow::Result;
 use candle_core::{DType, Module, Tensor};
 use candle_nn::{embedding, layer_norm, Dropout, Embedding, LayerNorm, VarBuilder};

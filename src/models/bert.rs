@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::factories::PreTrainedModel;
+use crate::model_factories::PreTrainedModel;
 use anyhow::Result;
 use candle_core::{DType, IndexOp, Module, Tensor};
 use candle_nn::{

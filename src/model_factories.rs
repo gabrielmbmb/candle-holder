@@ -2,7 +2,7 @@ use anyhow::Result;
 use candle_core::{Device, Tensor};
 use candle_nn::VarBuilder;
 
-use super::{
+use crate::models::{
     bert::{PreTrainedBertModel, BERT_DTYPE},
     roberta::{PreTrainedRobertaModel, ROBERTA_DTYPE},
 };
