@@ -1,19 +1,14 @@
 use anyhow::{Error, Result};
 use candle_core::{Device, Tensor};
-use candle_holder::{models::factories::AutoModelForSequenceClassification, AutoModel};
+use candle_holder::AutoModel;
 use tokenizers::Tokenizer;
 
 fn main() -> Result<()> {
     let device = Device::Cpu;
 
     // Load tokenizer and model
-    let tokenizer =
-        Tokenizer::from_pretrained("bhadresh-savani/bert-base-uncased-emotion", None).unwrap();
-    let model = AutoModelForSequenceClassification::from_pretrained(
-        "bhadresh-savani/bert-base-uncased-emotion",
-        &device,
-        None,
-    )?;
+    let tokenizer = Tokenizer::from_pretrained("bert-base-uncased", None).unwrap();
+    let model = AutoModel::from_pretrained("bert-base-uncased", &device, None)?;
     let tokens = tokenizer
         .encode("What's up?", true)
         .map_err(Error::msg)?
