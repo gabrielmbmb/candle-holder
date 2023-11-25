@@ -69,8 +69,12 @@ pub fn from_pretrained<S: AsRef<str>>(
 
     let config_file_path = api.get("config.json")?;
     let (weights_file_path, from_pth) = {
-        let weights_file_path = api.get("model.safetensors")?;
-        (weights_file_path, false)
+        if let Ok(weights_file_path) = api.get("model.safetensors") {
+            (weights_file_path, false)
+        } else {
+            let weights_file_path = api.get("pytorch_model.bin")?;
+            (weights_file_path, true)
+        }
     };
 
     Ok(ModelInfo {
