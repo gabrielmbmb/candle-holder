@@ -1,16 +1,14 @@
-use std::collections::HashMap;
-
-use crate::model_factories::PreTrainedModel;
+use crate::{config::PretrainedConfig, model_factories::PreTrainedModel};
 use anyhow::Result;
 use candle_core::{DType, IndexOp, Module, Tensor};
 use candle_nn::{
     embedding, layer_norm, linear, ops::softmax, Dropout, Embedding, LayerNorm, Linear, VarBuilder,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 pub const BERT_DTYPE: DType = DType::F32;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum HiddenAct {
     Gelu,
@@ -34,18 +32,17 @@ impl HiddenActLayer {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum PositionEmbeddingType {
     #[default]
     Absolute,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BertConfig {
     pub vocab_size: usize,
     pub hidden_size: usize,
-    pub id2label: Option<HashMap<usize, String>>,
     pub num_hidden_layers: usize,
     pub num_attention_heads: usize,
     pub intermediate_size: usize,
@@ -63,15 +60,9 @@ pub struct BertConfig {
     pub use_cache: bool,
     pub classifier_dropout: Option<f64>,
     pub model_type: Option<String>,
-}
 
-impl BertConfig {
-    fn num_labels(&self) -> usize {
-        if let Some(id2label) = &self.id2label {
-            return id2label.len();
-        }
-        0
-    }
+    #[serde(flatten)]
+    pub pretrained_config: Option<PretrainedConfig>,
 }
 
 impl Default for BertConfig {
@@ -79,7 +70,6 @@ impl Default for BertConfig {
         Self {
             vocab_size: 30522,
             hidden_size: 768,
-            id2label: None,
             num_hidden_layers: 12,
             num_attention_heads: 12,
             intermediate_size: 3072,
@@ -95,6 +85,7 @@ impl Default for BertConfig {
             use_cache: true,
             classifier_dropout: None,
             model_type: Some("bert".to_string()),
+            pretrained_config: None,
         }
     }
 }
@@ -428,23 +419,29 @@ impl BertModel {
 
 pub struct PreTrainedBertModel {
     model: BertModel,
+    config: BertConfig,
 }
 
 impl PreTrainedModel for PreTrainedBertModel {
     fn load(vb: VarBuilder, config: serde_json::Value) -> Result<Self> {
         let config: BertConfig = serde_json::from_value(config)?;
-        let model = BertModel::load(vb.pp("bert"), &config)?;
-        Ok(Self { model })
+        let model = BertModel::load(vb, &config)?;
+        Ok(Self { model, config })
     }
 
     fn forward(&self, input_ids: &Tensor, token_type_ids: &Tensor) -> Result<Tensor> {
         self.model.forward(input_ids, token_type_ids)
+    }
+
+    fn config(&self) -> Result<serde_json::Value> {
+        Ok(serde_json::to_value(self.config.clone())?)
     }
 }
 
 pub struct BertForSequenceClassification {
     model: BertModel,
     classifier: Linear,
+    config: BertConfig,
 }
 
 impl BertForSequenceClassification {}
@@ -453,14 +450,26 @@ impl PreTrainedModel for BertForSequenceClassification {
     fn load(vb: VarBuilder, config: serde_json::Value) -> Result<Self> {
         let config: BertConfig = serde_json::from_value(config)?;
         let model = BertModel::load(vb.pp("bert"), &config)?;
-        let classifier = linear(config.hidden_size, config.num_labels(), vb.pp("classifier"))?;
+        let classifier = linear(
+            config.hidden_size,
+            config.pretrained_config.as_ref().unwrap().num_labels(),
+            vb.pp("classifier"),
+        )?;
 
-        Ok(Self { model, classifier })
+        Ok(Self {
+            model,
+            classifier,
+            config,
+        })
     }
 
     fn forward(&self, input_ids: &Tensor, token_type_ids: &Tensor) -> Result<Tensor> {
         let pooled_output = self.model.forward(input_ids, token_type_ids)?;
         let logits = self.classifier.forward(&pooled_output)?;
         Ok(logits)
+    }
+
+    fn config(&self) -> Result<serde_json::Value> {
+        Ok(serde_json::to_value(self.config.clone())?)
     }
 }

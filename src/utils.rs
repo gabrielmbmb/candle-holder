@@ -48,6 +48,9 @@ impl ModelInfo {
     }
 }
 
+// TODO: function to convert old format to new format (gamma, beta) -> (weight, bias)
+// TODO: detect prefix
+
 pub fn from_pretrained<S: AsRef<str>>(
     repo_id: S,
     params: Option<FromPretrainedParameters>,
