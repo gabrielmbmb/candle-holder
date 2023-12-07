@@ -391,13 +391,13 @@ impl Module for BertPooler {
     }
 }
 
-pub struct BertModel {
+pub struct Bert {
     embeddings: BertEmbeddings,
     encoder: BertEncoder,
     pooler: BertPooler,
 }
 
-impl BertModel {
+impl Bert {
     pub fn load(vb: VarBuilder, config: &BertConfig) -> Result<Self> {
         let embeddings = BertEmbeddings::load(vb.pp("embeddings"), config)?;
         let encoder = BertEncoder::load(vb.pp("encoder"), config)?;
@@ -417,15 +417,15 @@ impl BertModel {
     }
 }
 
-pub struct PreTrainedBertModel {
-    model: BertModel,
+pub struct BertModel {
+    model: Bert,
     config: BertConfig,
 }
 
-impl PreTrainedModel for PreTrainedBertModel {
+impl PreTrainedModel for BertModel {
     fn load(vb: VarBuilder, config: serde_json::Value) -> Result<Self> {
         let config: BertConfig = serde_json::from_value(config)?;
-        let model = BertModel::load(vb, &config)?;
+        let model = Bert::load(vb, &config)?;
         Ok(Self { model, config })
     }
 
@@ -439,7 +439,7 @@ impl PreTrainedModel for PreTrainedBertModel {
 }
 
 pub struct BertForSequenceClassification {
-    model: BertModel,
+    model: Bert,
     classifier: Linear,
     config: BertConfig,
 }
@@ -449,7 +449,7 @@ impl BertForSequenceClassification {}
 impl PreTrainedModel for BertForSequenceClassification {
     fn load(vb: VarBuilder, config: serde_json::Value) -> Result<Self> {
         let config: BertConfig = serde_json::from_value(config)?;
-        let model = BertModel::load(vb.pp("bert"), &config)?;
+        let model = Bert::load(vb.pp("bert"), &config)?;
         let classifier = linear(
             config.hidden_size,
             config.pretrained_config.as_ref().unwrap().num_labels(),

@@ -10,7 +10,7 @@ pub use model_factories::{AutoModel, AutoModelForSequenceClassification};
 pub use utils::FromPretrainedParameters;
 
 // Model structs
-pub use models::bert::{BertForSequenceClassification, BertModel, PreTrainedBertModel};
+pub use models::bert::{Bert, BertForSequenceClassification, BertModel};
 
 // Pipelines
 pub use pipelines::text_classification::TextClassificationPipeline;

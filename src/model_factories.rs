@@ -2,7 +2,7 @@ use anyhow::{bail, Result};
 use candle_core::{Device, Tensor};
 use candle_nn::VarBuilder;
 
-use crate::models::bert::{PreTrainedBertModel, BERT_DTYPE};
+use crate::models::bert::{BertModel, BERT_DTYPE};
 
 use crate::{
     utils::{from_pretrained, FromPretrainedParameters},
@@ -10,8 +10,25 @@ use crate::{
 };
 
 macro_rules! impl_from_pretrained_method {
-    ($factory_struct:ident, $(($model_type:expr, $model_struct:ident, $dtype:expr)), *) => {
-        impl $factory_struct {
+    ($model_struct:ident, $dtype:expr) => {
+        impl $model_struct {
+            pub fn from_pretrained<S: AsRef<str>>(
+                repo_id: S,
+                device: &Device,
+                params: Option<FromPretrainedParameters>,
+            ) -> Result<Self> {
+                let model_info = from_pretrained(repo_id, params)?;
+                let config = model_info.config()?;
+                let vb = model_info.vb($dtype, device)?;
+                Self::load(vb, config)
+            }
+        }
+    };
+}
+
+macro_rules! impl_auto_model_from_pretrained_method {
+    ($auto_model_struct:ident, $(($model_type:expr, $model_struct:ident, $dtype:expr)), *) => {
+        impl $auto_model_struct {
             pub fn from_pretrained<S: AsRef<str>>(
                 repo_id: S,
                 device: &Device,
@@ -46,12 +63,13 @@ pub trait PreTrainedModel {
 }
 
 pub struct AutoModel {}
-
-impl_from_pretrained_method!(AutoModel, ("bert", PreTrainedBertModel, BERT_DTYPE));
+impl_auto_model_from_pretrained_method!(AutoModel, ("bert", BertModel, BERT_DTYPE));
 
 pub struct AutoModelForSequenceClassification {}
-
-impl_from_pretrained_method!(
+impl_auto_model_from_pretrained_method!(
     AutoModelForSequenceClassification,
     ("bert", BertForSequenceClassification, BERT_DTYPE)
 );
+
+// Implement `from_pretrained` method for each model
+impl_from_pretrained_method!(BertModel, BERT_DTYPE);
