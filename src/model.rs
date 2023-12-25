@@ -2,6 +2,7 @@ use anyhow::{bail, Result};
 use candle_core::{Device, Tensor};
 use candle_nn::VarBuilder;
 
+use crate::config::PretrainedConfig;
 use crate::models::bert::{BertModel, BERT_DTYPE};
 
 use crate::{
@@ -42,7 +43,7 @@ macro_rules! impl_auto_model_from_pretrained_method {
                     $(
                         $model_type => {
                             let vb = model_info.vb($dtype, device)?;
-                            Ok(Box::new($model_struct::load(vb, config).unwrap()))
+                            Ok(Box::new($model_struct::load(vb, config)?))
                         },
                     )*
                     _ => bail!(format!("Model '{}' type not supported", model_type)),
@@ -58,7 +59,7 @@ pub trait PreTrainedModel {
     fn load(vb: VarBuilder, config: serde_json::Value) -> Result<Self>
     where
         Self: Sized;
-    fn config(&self) -> Result<serde_json::Value>;
+    fn config(&self) -> PretrainedConfig;
     fn forward(&self, input_ids: &Tensor, token_type_ids: &Tensor) -> Result<Tensor>;
 }
 

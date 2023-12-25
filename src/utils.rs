@@ -7,7 +7,6 @@ use hf_hub::{api::sync::ApiBuilder, Repo, RepoType};
 
 #[derive(Debug, Clone)]
 pub struct FromPretrainedParameters {
-    pub from_pth: bool,
     pub revision: String,
     pub user_agent: HashMap<String, String>,
     pub auth_token: Option<String>,
@@ -16,7 +15,6 @@ pub struct FromPretrainedParameters {
 impl Default for FromPretrainedParameters {
     fn default() -> Self {
         Self {
-            from_pth: false,
             revision: "main".into(),
             user_agent: HashMap::new(),
             auth_token: None,

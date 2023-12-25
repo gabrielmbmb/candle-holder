@@ -1,17 +1,12 @@
 use anyhow::{Error, Result};
-use candle_core::{Device, D};
-use candle_nn::ops::softmax;
-use tokenizers::Tokenizer;
+use candle_core::{Device, Tensor, D};
+use candle_nn::ops::{sigmoid, softmax};
+use tokenizers::{EncodeInput, Tokenizer};
 
 use crate::{
-    model_factories::PreTrainedModel, tokenizer::TensorEncoding, AutoModelForSequenceClassification,
+    config::ProblemType, model::PreTrainedModel, utils::FromPretrainedParameters,
+    AutoModelForSequenceClassification, AutoTokenizer,
 };
-
-pub enum ClassificationFunction {
-    Softmax,
-    Sigmoid,
-    None,
-}
 
 pub struct TextClassificationPipeline {
     model: Box<dyn PreTrainedModel>,
@@ -20,9 +15,17 @@ pub struct TextClassificationPipeline {
 }
 
 impl TextClassificationPipeline {
-    pub fn new<S: AsRef<str> + Copy>(identifier: S, device: &Device) -> Result<Self> {
-        let model = AutoModelForSequenceClassification::from_pretrained(identifier, device, None)?;
-        let tokenizer = Tokenizer::from_pretrained(identifier, None).unwrap();
+    pub fn new<S: AsRef<str> + Copy>(
+        identifier: S,
+        device: &Device,
+        params: Option<FromPretrainedParameters>,
+    ) -> Result<Self> {
+        let model = AutoModelForSequenceClassification::from_pretrained(
+            identifier,
+            device,
+            params.clone(),
+        )?;
+        let tokenizer = AutoTokenizer::from_pretrained(identifier, params)?;
         Ok(Self {
             model,
             tokenizer,
@@ -30,35 +33,88 @@ impl TextClassificationPipeline {
         })
     }
 
-    pub fn forward<I: AsRef<str>>(
-        &self,
-        input: I,
-        add_special_tokens: bool,
-    ) -> Result<Vec<(String, f32)>> {
-        // Preprocessing
-        let encoding = self
+    fn preprocessing<'s, E>(&self, inputs: Vec<E>) -> Result<(Tensor, Tensor)>
+    where
+        E: Into<EncodeInput<'s>> + Send,
+    {
+        let encodings = self
             .tokenizer
-            .encode(input.as_ref(), add_special_tokens)
+            .encode_batch(inputs, true)
             .map_err(Error::msg)?;
-        let input_ids = encoding.get_ids_tensor(&self.device)?;
-        let token_type_ids = encoding.get_type_ids_tensor(&self.device)?;
 
-        // Forward
+        let mut input_ids: Vec<Vec<u32>> = Vec::new();
+        let mut token_type_ids: Vec<Vec<u32>> = Vec::new();
+
+        for encoding in encodings {
+            input_ids.push(encoding.get_ids().to_vec());
+            token_type_ids.push(encoding.get_type_ids().to_vec());
+        }
+
+        let input_ids = Tensor::new(input_ids, &self.device)?;
+        let token_type_ids = Tensor::new(token_type_ids, &self.device)?;
+
+        Ok((input_ids, token_type_ids))
+    }
+
+    fn postprocessing(
+        &self,
+        model_outputs: Tensor,
+        top_k: Option<usize>,
+    ) -> Result<Vec<Vec<(String, f32)>>> {
+        let config = self.model.config();
+
+        let scores = {
+            if config.problem_type == ProblemType::MultiLabelClassification
+                || config.num_labels() == 1
+            {
+                sigmoid(&model_outputs)?
+            } else if config.problem_type == ProblemType::SingleLabelClassification
+                || config.num_labels() > 1
+            {
+                softmax(&model_outputs, D::Minus1)?
+            } else {
+                model_outputs
+            }
+        }
+        .to_vec2::<f32>()?;
+
+        let mut results = Vec::new();
+
+        for inner in &scores {
+            let mut scores_with_labels = inner
+                .iter()
+                .enumerate()
+                .map(|(i, score)| {
+                    let label = config.id2label.get(&i.to_string()).unwrap();
+                    (label.to_string(), *score)
+                })
+                .collect::<Vec<(String, f32)>>();
+            scores_with_labels.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+            if let Some(top_k) = top_k {
+                scores_with_labels.truncate(top_k as usize);
+            }
+            results.push(scores_with_labels);
+        }
+
+        Ok(results)
+    }
+
+    pub fn run<I: AsRef<str>>(&self, input: I, top_k: Option<usize>) -> Result<Vec<(String, f32)>> {
+        let (input_ids, token_type_ids) = self.preprocessing(vec![input.as_ref()])?;
         let output = self.model.forward(&input_ids, &token_type_ids)?;
-        let scores = softmax(&output, D::Minus1)?.squeeze(0)?.to_vec1::<f32>()?;
+        Ok(self.postprocessing(output, top_k)?[0].clone())
+    }
 
-        // Postprocessing
-        let config = self.model.config()?;
-        let mut scores = scores
-            .iter()
-            .enumerate()
-            .map(move |(i, score)| {
-                let label = config["id2label"][i.to_string()].as_str().unwrap();
-                (label.to_string(), *score)
-            })
-            .collect::<Vec<(String, f32)>>();
-        scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
-
-        Ok(scores)
+    pub fn run_batch<'s, E>(
+        &self,
+        inputs: Vec<E>,
+        top_k: Option<usize>,
+    ) -> Result<Vec<Vec<(String, f32)>>>
+    where
+        E: Into<EncodeInput<'s>> + Send,
+    {
+        let (input_ids, token_type_ids) = self.preprocessing(inputs)?;
+        let output = self.model.forward(&input_ids, &token_type_ids)?;
+        self.postprocessing(output, top_k)
     }
 }

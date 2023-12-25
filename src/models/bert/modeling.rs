@@ -1,4 +1,4 @@
-use crate::{config::PretrainedConfig, model_factories::PreTrainedModel};
+use crate::{config::PretrainedConfig, model::PreTrainedModel};
 use anyhow::Result;
 use candle_core::{DType, IndexOp, Module, Tensor};
 use candle_nn::{
@@ -61,8 +61,8 @@ pub struct BertConfig {
     pub classifier_dropout: Option<f64>,
     pub model_type: Option<String>,
 
-    #[serde(flatten)]
-    pub pretrained_config: Option<PretrainedConfig>,
+    #[serde(flatten, default)]
+    pub pretrained_config: PretrainedConfig,
 }
 
 impl Default for BertConfig {
@@ -85,7 +85,7 @@ impl Default for BertConfig {
             use_cache: true,
             classifier_dropout: None,
             model_type: Some("bert".to_string()),
-            pretrained_config: None,
+            pretrained_config: PretrainedConfig::default(),
         }
     }
 }
@@ -425,7 +425,7 @@ pub struct BertModel {
 impl PreTrainedModel for BertModel {
     fn load(vb: VarBuilder, config: serde_json::Value) -> Result<Self> {
         let config: BertConfig = serde_json::from_value(config)?;
-        let model = Bert::load(vb, &config)?;
+        let model = Bert::load(vb.pp("bert"), &config)?;
         Ok(Self { model, config })
     }
 
@@ -433,8 +433,8 @@ impl PreTrainedModel for BertModel {
         self.model.forward(input_ids, token_type_ids)
     }
 
-    fn config(&self) -> Result<serde_json::Value> {
-        Ok(serde_json::to_value(self.config.clone())?)
+    fn config(&self) -> PretrainedConfig {
+        self.config.pretrained_config.clone()
     }
 }
 
@@ -452,7 +452,7 @@ impl PreTrainedModel for BertForSequenceClassification {
         let model = Bert::load(vb.pp("bert"), &config)?;
         let classifier = linear(
             config.hidden_size,
-            config.pretrained_config.as_ref().unwrap().num_labels(),
+            config.pretrained_config.num_labels(),
             vb.pp("classifier"),
         )?;
 
@@ -469,7 +469,7 @@ impl PreTrainedModel for BertForSequenceClassification {
         Ok(logits)
     }
 
-    fn config(&self) -> Result<serde_json::Value> {
-        Ok(serde_json::to_value(self.config.clone())?)
+    fn config(&self) -> PretrainedConfig {
+        self.config.pretrained_config.clone()
     }
 }
