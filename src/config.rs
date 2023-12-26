@@ -22,12 +22,16 @@ impl Default for ProblemType {
 pub struct PretrainedConfig {
     #[serde(default)]
     pub problem_type: ProblemType,
-    pub id2label: HashMap<String, String>,
+    pub id2label: Option<HashMap<String, String>>,
 }
 
 impl PretrainedConfig {
     pub fn num_labels(&self) -> usize {
-        self.id2label.len()
+        if let Some(id2label) = &self.id2label {
+            id2label.len()
+        } else {
+            0
+        }
     }
 }
 
@@ -35,7 +39,7 @@ impl Default for PretrainedConfig {
     fn default() -> Self {
         Self {
             problem_type: ProblemType::None,
-            id2label: HashMap::new(),
+            id2label: Some(HashMap::new()),
         }
     }
 }

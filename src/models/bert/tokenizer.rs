@@ -66,12 +66,13 @@ impl BertTokenizer {
             return Tokenizer::from_file(tokenizer).map_err(Error::msg);
         }
 
-        if let Some(vocab) = tokenizer_info.vocab {
-            if let Some(config) = tokenizer_info.config {
-                return Ok(Self::from_vocab(vocab, config));
-            }
-        }
+        let vocab = tokenizer_info
+            .vocab
+            .ok_or_else(|| Error::msg("Could not build BertTokenizer because vocab is missing"))?;
+        let config = tokenizer_info.config.ok_or_else(|| {
+            Error::msg("Could not build BertTokenizer because tokenizer config is missing")
+        })?;
 
-        Err(Error::msg("Could not build BertTokenizer"))
+        Ok(BertTokenizer::from_vocab(vocab, config))
     }
 }

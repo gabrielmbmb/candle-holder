@@ -2,7 +2,9 @@ use crate::{config::PretrainedConfig, model::PreTrainedModel};
 use anyhow::Result;
 use candle_core::{DType, IndexOp, Module, Tensor};
 use candle_nn::{
-    embedding, layer_norm, linear, ops::softmax, Dropout, Embedding, LayerNorm, Linear, VarBuilder,
+    embedding, layer_norm, linear,
+    ops::{dropout, softmax},
+    Dropout, Embedding, LayerNorm, Linear, VarBuilder,
 };
 use serde::{Deserialize, Serialize};
 
@@ -58,7 +60,7 @@ pub struct BertConfig {
     pub position_embedding_type: PositionEmbeddingType,
     #[serde(default)]
     pub use_cache: bool,
-    pub classifier_dropout: Option<f64>,
+    pub classifier_dropout: Option<f32>,
     pub model_type: Option<String>,
 
     #[serde(flatten, default)]
@@ -409,9 +411,18 @@ impl Bert {
         })
     }
 
-    pub fn forward(&self, input_ids: &Tensor, token_type_ids: &Tensor) -> Result<Tensor> {
+    pub fn forward_return_sequence(
+        &self,
+        input_ids: &Tensor,
+        token_type_ids: &Tensor,
+    ) -> Result<Tensor> {
         let embedding_output = self.embeddings.forward(input_ids, token_type_ids)?;
         let sequence_output = self.encoder.forward(&embedding_output)?;
+        Ok(sequence_output)
+    }
+
+    pub fn forward(&self, input_ids: &Tensor, token_type_ids: &Tensor) -> Result<Tensor> {
+        let sequence_output = self.forward_return_sequence(input_ids, token_type_ids)?;
         let pooled_output = self.pooler.forward(&sequence_output)?;
         Ok(pooled_output)
     }
@@ -440,16 +451,16 @@ impl PreTrainedModel for BertModel {
 
 pub struct BertForSequenceClassification {
     model: Bert,
+    dropout: Dropout,
     classifier: Linear,
     config: BertConfig,
 }
-
-impl BertForSequenceClassification {}
 
 impl PreTrainedModel for BertForSequenceClassification {
     fn load(vb: VarBuilder, config: serde_json::Value) -> Result<Self> {
         let config: BertConfig = serde_json::from_value(config)?;
         let model = Bert::load(vb.pp("bert"), &config)?;
+        let dropout = Dropout::new(config.classifier_dropout.unwrap_or(0.1));
         let classifier = linear(
             config.hidden_size,
             config.pretrained_config.num_labels(),
@@ -458,6 +469,7 @@ impl PreTrainedModel for BertForSequenceClassification {
 
         Ok(Self {
             model,
+            dropout,
             classifier,
             config,
         })
@@ -465,7 +477,48 @@ impl PreTrainedModel for BertForSequenceClassification {
 
     fn forward(&self, input_ids: &Tensor, token_type_ids: &Tensor) -> Result<Tensor> {
         let pooled_output = self.model.forward(input_ids, token_type_ids)?;
+        let pooled_output = self.dropout.forward(&pooled_output, false)?;
         let logits = self.classifier.forward(&pooled_output)?;
+        Ok(logits)
+    }
+
+    fn config(&self) -> PretrainedConfig {
+        self.config.pretrained_config.clone()
+    }
+}
+
+pub struct BertForTokenClassification {
+    model: Bert,
+    dropout: Dropout,
+    classifier: Linear,
+    config: BertConfig,
+}
+
+impl PreTrainedModel for BertForTokenClassification {
+    fn load(vb: VarBuilder, config: serde_json::Value) -> Result<Self> {
+        let config: BertConfig = serde_json::from_value(config)?;
+        let model = Bert::load(vb.pp("bert"), &config)?;
+        let dropout = Dropout::new(config.classifier_dropout.unwrap_or(0.1));
+        let classifier = linear(
+            config.hidden_size,
+            config.pretrained_config.num_labels(),
+            vb.pp("classifier"),
+        )?;
+
+        Ok(Self {
+            model,
+            dropout,
+            classifier,
+            config,
+        })
+    }
+
+    fn forward(&self, input_ids: &Tensor, token_type_ids: &Tensor) -> Result<Tensor> {
+        let sequence_output = self
+            .model
+            .forward_return_sequence(input_ids, token_type_ids)?;
+        let sequence_output = self.dropout.forward(&sequence_output, false)?;
+        let logits = self.classifier.forward(&sequence_output)?;
         Ok(logits)
     }
 

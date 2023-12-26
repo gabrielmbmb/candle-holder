@@ -62,6 +62,11 @@ impl TextClassificationPipeline {
         top_k: Option<usize>,
     ) -> Result<Vec<Vec<(String, f32)>>> {
         let config = self.model.config();
+        // TODO: move this to `new` method to avoid cloning every time?
+        let id2label = config
+            .clone()
+            .id2label
+            .ok_or_else(|| Error::msg("id2label not found in model config"))?;
 
         let scores = {
             if config.problem_type == ProblemType::MultiLabelClassification
@@ -85,7 +90,7 @@ impl TextClassificationPipeline {
                 .iter()
                 .enumerate()
                 .map(|(i, score)| {
-                    let label = config.id2label.get(&i.to_string()).unwrap();
+                    let label = id2label.get(&i.to_string()).unwrap();
                     (label.to_string(), *score)
                 })
                 .collect::<Vec<(String, f32)>>();

@@ -4,6 +4,7 @@ use candle_nn::VarBuilder;
 
 use crate::config::PretrainedConfig;
 use crate::models::bert::{BertModel, BERT_DTYPE};
+use crate::BertForTokenClassification;
 
 use crate::{
     utils::{from_pretrained, FromPretrainedParameters},
@@ -64,12 +65,21 @@ pub trait PreTrainedModel {
 }
 
 pub struct AutoModel {}
+
 impl_auto_model_from_pretrained_method!(AutoModel, ("bert", BertModel, BERT_DTYPE));
 
 pub struct AutoModelForSequenceClassification {}
+
 impl_auto_model_from_pretrained_method!(
     AutoModelForSequenceClassification,
     ("bert", BertForSequenceClassification, BERT_DTYPE)
+);
+
+pub struct AutoModelForTokenClassification {}
+
+impl_auto_model_from_pretrained_method!(
+    AutoModelForTokenClassification,
+    ("bert", BertForTokenClassification, BERT_DTYPE)
 );
 
 // Implement `from_pretrained` method for each model
