@@ -1,12 +1,18 @@
 use std::{collections::HashMap, fs};
 
-use crate::{models::bert::BertTokenizer, FromPretrainedParameters};
+use crate::{
+    models::{bert::BertTokenizer, roberta::tokenizer::RobertaTokenizer},
+    FromPretrainedParameters,
+};
 use anyhow::{bail, Error, Result};
 use candle_core::{Device, Tensor};
 use hf_hub::{api::sync::Api, Repo, RepoType};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use tokenizers::{Encoding, Tokenizer};
+use tokenizers::{
+    models::bpe::{Merges, Vocab},
+    Encoding, Tokenizer,
+};
 
 pub trait TensorEncoding {
     fn get_ids_tensor(&self, device: &Device) -> Result<Tensor>;
@@ -35,8 +41,23 @@ impl TensorEncoding for Encoding {
     }
 }
 
-pub fn load_vocab(vocab_file_path: std::path::PathBuf) -> Result<HashMap<String, u32>> {
-    let vocab = fs::read_to_string(vocab_file_path)?
+const TOKENIZER_CONFIG_FILE: &str = "tokenizer_config.json";
+const TOKENIZER_FILE: &str = "tokenizer.json";
+const VOCAB_TXT_FILE: &str = "vocab.txt";
+const VOCAB_JSON_FILE: &str = "vocab.json";
+const MERGES_FILE: &str = "merges.txt";
+
+lazy_static! {
+    static ref MODEL_TYPE_TO_TOKENIZER_CLASS: HashMap<String, String> = {
+        let mut map = HashMap::new();
+        map.insert("bert".to_string(), "BertTokenizer".to_string());
+        map.insert("roberta".to_string(), "RobertaTokenizer".to_string());
+        map
+    };
+}
+
+pub fn load_vocab_txt(vocab_txt_file_path: std::path::PathBuf) -> Result<Vocab> {
+    let vocab = fs::read_to_string(vocab_txt_file_path)?
         .lines()
         .enumerate()
         .fold(HashMap::<String, u32>::new(), |mut map, (idx, line)| {
@@ -46,17 +67,24 @@ pub fn load_vocab(vocab_file_path: std::path::PathBuf) -> Result<HashMap<String,
     Ok(vocab)
 }
 
-const TOKENIZER_CONFIG_FILE: &str = "tokenizer_config.json";
-const TOKENIZER_FILE: &str = "tokenizer.json";
-const VOCAB_FILE: &str = "vocab.txt";
-const MERGE_FILE: &str = "merges.txt";
+pub fn load_vocab_json(vocab_json_file_path: std::path::PathBuf) -> Result<Vocab> {
+    let vocab = fs::read_to_string(vocab_json_file_path)?;
+    let vocab: Vocab = serde_json::from_str(vocab.as_str())?;
+    Ok(vocab)
+}
 
-lazy_static! {
-    static ref MODEL_TYPE_TO_TOKENIZER_CLASS: HashMap<String, String> = {
-        let mut map = HashMap::new();
-        map.insert("bert".to_string(), "BertTokenizer".to_string());
-        map
-    };
+pub fn load_merges(merges_file_path: std::path::PathBuf) -> Result<Merges> {
+    let merges = fs::read_to_string(merges_file_path)?.lines().skip(1).fold(
+        Vec::<(String, String)>::new(),
+        |mut vec, line| {
+            let line = line.to_string();
+            let merge = line.split_once(' ').unwrap();
+            let merge = (merge.0.to_string(), merge.1.to_string());
+            vec.push(merge);
+            vec
+        },
+    );
+    Ok(merges)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -101,7 +129,8 @@ pub struct TokenizerInfo {
     pub config: Option<TokenizerConfig>,
     pub model_config: Option<serde_json::Value>,
     pub tokenizer_file_path: Option<std::path::PathBuf>,
-    pub vocab: Option<HashMap<String, u32>>,
+    pub vocab: Option<Vocab>,
+    pub merges: Option<Merges>,
 }
 
 impl TokenizerInfo {
@@ -109,13 +138,15 @@ impl TokenizerInfo {
         config: Option<TokenizerConfig>,
         model_config: Option<serde_json::Value>,
         tokenizer_file_path: Option<std::path::PathBuf>,
-        vocab: Option<HashMap<String, u32>>,
+        vocab: Option<Vocab>,
+        merges: Option<Merges>,
     ) -> Self {
         TokenizerInfo {
             config,
             model_config,
             tokenizer_file_path,
             vocab,
+            merges,
         }
     }
 
@@ -136,7 +167,9 @@ impl TokenizerInfo {
 
         if let Some(model_config) = &self.model_config {
             if let Some(model_type) = model_config["model_type"].as_str() {
-                return MODEL_TYPE_TO_TOKENIZER_CLASS.get(model_type).unwrap();
+                if let Some(tokenizer_class) = MODEL_TYPE_TO_TOKENIZER_CLASS.get(model_type) {
+                    return tokenizer_class;
+                }
             }
         }
 
@@ -168,7 +201,7 @@ pub fn from_pretrained<I: AsRef<str>>(
     };
 
     // Used to determine the tokenizer class if the other methods fail
-    let model_config: Option<serde_json::Value> = match api.get("config.json") {
+    let model_config = match api.get("config.json") {
         Ok(model_config_file_path) => {
             let model_config = fs::read_to_string(model_config_file_path)?;
             let model_config: serde_json::Value = serde_json::from_str(&model_config)?;
@@ -178,14 +211,23 @@ pub fn from_pretrained<I: AsRef<str>>(
     };
 
     // Try to load `tokenizer.json` config
-    let tokenizer_file_path: Option<std::path::PathBuf> = match api.get(TOKENIZER_FILE) {
+    let tokenizer_file_path = match api.get(TOKENIZER_FILE) {
         Ok(tokenizer_file_path) => Some(tokenizer_file_path),
         Err(_) => None,
     };
 
-    // Try to load `vocab.txt`
-    let vocab: Option<HashMap<String, u32>> = match api.get(VOCAB_FILE) {
-        Ok(vocab_file_path) => load_vocab(vocab_file_path).ok(),
+    // Try to load `vocab.json` or `vocab.txt`
+    let vocab = match api.get(VOCAB_JSON_FILE) {
+        Ok(vocab_json_file_path) => load_vocab_json(vocab_json_file_path).ok(),
+        Err(_) => match api.get(VOCAB_TXT_FILE) {
+            Ok(vocab_txt_file_path) => load_vocab_txt(vocab_txt_file_path).ok(),
+            Err(_) => None,
+        },
+    };
+
+    // Try to load `merges.txt`
+    let merges = match api.get(MERGES_FILE) {
+        Ok(merges_file_path) => load_merges(merges_file_path).ok(),
         Err(_) => None,
     };
 
@@ -194,6 +236,7 @@ pub fn from_pretrained<I: AsRef<str>>(
         model_config,
         tokenizer_file_path,
         vocab,
+        merges,
     ))
 }
 
@@ -210,8 +253,8 @@ macro_rules! impl_auto_tokenizer_from_pretrained_method {
                 let tokenizer = match tokenizer_info.get_tokenizer_class() {
                     $(
                         $tokenizer_class => $tokenizer_struct::from_tokenizer_info(tokenizer_info),
-                        _ => bail!(format!("Could not determine tokenizer class")),
                     )*
+                    _ => bail!(format!("Could not determine tokenizer class")),
                 };
 
                 tokenizer
@@ -220,7 +263,11 @@ macro_rules! impl_auto_tokenizer_from_pretrained_method {
     };
 }
 
-impl_auto_tokenizer_from_pretrained_method!(AutoTokenizer, ("BertTokenizer", BertTokenizer));
+impl_auto_tokenizer_from_pretrained_method!(
+    AutoTokenizer,
+    ("BertTokenizer", BertTokenizer),
+    ("RobertaTokenizer", RobertaTokenizer)
+);
 
 // Implement `from_pretrained` method for each tokenizer
 macro_rules! impl_tokenizer_from_pretrained_method {

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::tokenizer;
 use anyhow::{Error, Result};
+use tokenizers::models::bpe::Vocab;
 use tokenizers::normalizers::BertNormalizer;
 use tokenizers::{
     decoders::wordpiece::WordPiece as WordPieceDecoder, pre_tokenizers::bert::BertPreTokenizer,
@@ -19,10 +20,7 @@ const BERT_CLS_TOKEN: &str = "[CLS]";
 pub struct BertTokenizer {}
 
 impl BertTokenizer {
-    pub fn from_vocab(
-        vocab: HashMap<String, u32>,
-        config: tokenizer::TokenizerConfig,
-    ) -> Tokenizer {
+    pub fn from_vocab(vocab: Vocab, config: tokenizer::TokenizerConfig) -> Tokenizer {
         let unk_token = config.unk_token.unwrap_or(BERT_UNK_TOKEN.to_string());
         let cls_token = config.cls_token.unwrap_or(BERT_CLS_TOKEN.to_string());
         let sep_token = config.sep_token.unwrap_or(BERT_SEP_TOKEN.to_string());
@@ -32,7 +30,7 @@ impl BertTokenizer {
             .unk_token(unk_token)
             .build()
             .unwrap();
-        let template_processing = TemplateProcessing::builder()
+        let post_processor = TemplateProcessing::builder()
             .try_single(format!("{} $A {}", cls_token, sep_token))
             .unwrap()
             .try_pair(format!("{} $A {} $B:1 {}", cls_token, sep_token, sep_token))
@@ -55,8 +53,9 @@ impl BertTokenizer {
         tokenizer
             .with_normalizer(normalizer)
             .with_pre_tokenizer(pre_tokenizer)
-            .with_post_processor(template_processing)
+            .with_post_processor(post_processor)
             .with_decoder(decoder)
+            // TODO: build padding from config
             .with_padding(Some(PaddingParams::default()));
 
         Tokenizer::from(tokenizer)
