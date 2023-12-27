@@ -17,13 +17,30 @@ const BERT_SEP_TOKEN: &str = "[SEP]";
 const BERT_PAD_TOKEN: &str = "[PAD]";
 const BERT_CLS_TOKEN: &str = "[CLS]";
 
+impl From<tokenizer::TokenizerConfig> for BertNormalizer {
+    fn from(config: tokenizer::TokenizerConfig) -> Self {
+        let strip_accents = config.strip_accents;
+        let lowercase = config.do_lower_case.unwrap_or(false);
+        BertNormalizer::new(true, true, strip_accents, lowercase)
+    }
+}
+
 pub struct BertTokenizer {}
 
 impl BertTokenizer {
     pub fn from_vocab(vocab: Vocab, config: tokenizer::TokenizerConfig) -> Tokenizer {
-        let unk_token = config.unk_token.unwrap_or(BERT_UNK_TOKEN.to_string());
-        let cls_token = config.cls_token.unwrap_or(BERT_CLS_TOKEN.to_string());
-        let sep_token = config.sep_token.unwrap_or(BERT_SEP_TOKEN.to_string());
+        let unk_token = config
+            .unk_token
+            .clone()
+            .unwrap_or(BERT_UNK_TOKEN.to_string());
+        let cls_token = config
+            .cls_token
+            .clone()
+            .unwrap_or(BERT_CLS_TOKEN.to_string());
+        let sep_token = config
+            .sep_token
+            .clone()
+            .unwrap_or(BERT_SEP_TOKEN.to_string());
 
         let word_piece = WordPiece::builder()
             .vocab(vocab)
@@ -39,7 +56,7 @@ impl BertTokenizer {
             .build()
             .unwrap();
         let pre_tokenizer = BertPreTokenizer {};
-        let normalizer = BertNormalizer::default();
+        let normalizer = BertNormalizer::from(config);
         let decoder = WordPieceDecoder::default();
 
         let mut tokenizer: TokenizerImpl<
