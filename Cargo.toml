@@ -7,9 +7,8 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.75"
-candle-core = "0.3.1"
-candle-nn = "0.3.1"
-candle-transformers = "0.3.1"
+candle-core = "0.3.2"
+candle-nn = "0.3.2"
 hf-hub = "0.3.2"
 lazy_static = "1.4.0"
 serde = { version = "1.0.192", features = ["derive"] }

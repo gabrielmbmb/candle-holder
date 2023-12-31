@@ -2,9 +2,7 @@ use crate::{config::PretrainedConfig, model::PreTrainedModel};
 use anyhow::Result;
 use candle_core::{DType, IndexOp, Module, Tensor};
 use candle_nn::{
-    embedding, layer_norm, linear,
-    ops::{dropout, softmax},
-    Dropout, Embedding, LayerNorm, Linear, VarBuilder,
+    embedding, layer_norm, linear, ops::softmax, Dropout, Embedding, LayerNorm, Linear, VarBuilder,
 };
 use serde::{Deserialize, Serialize};
 

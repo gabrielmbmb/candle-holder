@@ -84,3 +84,5 @@ impl_auto_model_from_pretrained_method!(
 
 // Implement `from_pretrained` method for each model
 impl_from_pretrained_method!(BertModel, BERT_DTYPE);
+impl_from_pretrained_method!(BertForSequenceClassification, BERT_DTYPE);
+impl_from_pretrained_method!(BertForTokenClassification, BERT_DTYPE);
