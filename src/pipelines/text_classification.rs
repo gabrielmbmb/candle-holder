@@ -90,7 +90,7 @@ impl TextClassificationPipeline {
                 .iter()
                 .enumerate()
                 .map(|(i, score)| {
-                    let label = id2label.get(&i.to_string()).unwrap();
+                    let label = id2label.get(&i).unwrap();
                     (label.to_string(), *score)
                 })
                 .collect::<Vec<(String, f32)>>();

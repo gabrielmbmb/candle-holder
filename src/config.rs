@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
@@ -22,7 +22,23 @@ impl Default for ProblemType {
 pub struct PretrainedConfig {
     #[serde(default)]
     pub problem_type: ProblemType,
-    pub id2label: Option<HashMap<String, String>>,
+    #[serde(default, deserialize_with = "deserialize_id2label")]
+    pub id2label: Option<HashMap<usize, String>>,
+}
+
+fn deserialize_id2label<'de, D>(deserializer: D) -> Result<Option<HashMap<usize, String>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let map: Option<HashMap<String, String>> = Deserialize::deserialize(deserializer)?;
+    Ok(map.map(|m| {
+        m.into_iter()
+            .map(|(k, v)| {
+                let shot = k.parse::<usize>().unwrap();
+                (shot, v)
+            })
+            .collect::<HashMap<usize, String>>()
+    }))
 }
 
 impl PretrainedConfig {

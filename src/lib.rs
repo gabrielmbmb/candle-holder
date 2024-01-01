@@ -17,4 +17,6 @@ pub use models::bert::{
 
 // Pipelines
 pub use pipelines::text_classification::TextClassificationPipeline;
-pub use pipelines::token_classification::TokenClassificationPipeline;
+pub use pipelines::token_classification::{
+    AggregationStrategy, TokenClassificationOptions, TokenClassificationPipeline,
+};
