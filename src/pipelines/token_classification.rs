@@ -136,7 +136,7 @@ impl TokenClassificationPipeline {
         })
     }
 
-    fn preprocessing<'s, E>(&self, inputs: Vec<E>) -> Result<(Tensor, Tensor, Vec<Encoding>)>
+    fn preprocess<'s, E>(&self, inputs: Vec<E>) -> Result<(Tensor, Tensor, Vec<Encoding>)>
     where
         E: Into<EncodeInput<'s>> + Send,
     {
@@ -450,7 +450,7 @@ impl TokenClassificationPipeline {
             .collect()
     }
 
-    fn postprocessing(
+    fn postprocess(
         &self,
         sentences: Vec<String>,
         batch_input_ids: Vec<Vec<u32>>,
@@ -479,10 +479,10 @@ impl TokenClassificationPipeline {
     ) -> Result<Vec<Entity>> {
         let options = options.unwrap_or_default();
         let sentences = vec![input.as_ref().to_string()];
-        let (input_ids, token_type_ids, encodings) = self.preprocessing(vec![input.as_ref()])?;
+        let (input_ids, token_type_ids, encodings) = self.preprocess(vec![input.as_ref()])?;
         let output = self.model.forward(&input_ids, &token_type_ids)?;
         let entities = self
-            .postprocessing(
+            .postprocess(
                 sentences,
                 input_ids.to_vec2::<u32>()?,
                 &output,
@@ -506,9 +506,9 @@ impl TokenClassificationPipeline {
     {
         let options = options.unwrap_or_default();
         let sentences = vec![];
-        let (input_ids, token_type_ids, encodings) = self.preprocessing(inputs)?;
+        let (input_ids, token_type_ids, encodings) = self.preprocess(inputs)?;
         let output = self.model.forward(&input_ids, &token_type_ids)?;
-        self.postprocessing(
+        self.postprocess(
             sentences,
             input_ids.to_vec2::<u32>()?,
             &output,

@@ -33,7 +33,7 @@ impl TextClassificationPipeline {
         })
     }
 
-    fn preprocessing<'s, E>(&self, inputs: Vec<E>) -> Result<(Tensor, Tensor)>
+    fn preprocess<'s, E>(&self, inputs: Vec<E>) -> Result<(Tensor, Tensor)>
     where
         E: Into<EncodeInput<'s>> + Send,
     {
@@ -56,7 +56,7 @@ impl TextClassificationPipeline {
         Ok((input_ids, token_type_ids))
     }
 
-    fn postprocessing(
+    fn postprocess(
         &self,
         model_outputs: Tensor,
         top_k: Option<usize>,
@@ -105,9 +105,9 @@ impl TextClassificationPipeline {
     }
 
     pub fn run<I: AsRef<str>>(&self, input: I, top_k: Option<usize>) -> Result<Vec<(String, f32)>> {
-        let (input_ids, token_type_ids) = self.preprocessing(vec![input.as_ref()])?;
+        let (input_ids, token_type_ids) = self.preprocess(vec![input.as_ref()])?;
         let output = self.model.forward(&input_ids, &token_type_ids)?;
-        Ok(self.postprocessing(output, top_k)?[0].clone())
+        Ok(self.postprocess(output, top_k)?[0].clone())
     }
 
     pub fn run_batch<'s, E>(
@@ -118,8 +118,8 @@ impl TextClassificationPipeline {
     where
         E: Into<EncodeInput<'s>> + Send,
     {
-        let (input_ids, token_type_ids) = self.preprocessing(inputs)?;
+        let (input_ids, token_type_ids) = self.preprocess(inputs)?;
         let output = self.model.forward(&input_ids, &token_type_ids)?;
-        self.postprocessing(output, top_k)
+        self.postprocess(output, top_k)
     }
 }
