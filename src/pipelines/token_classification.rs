@@ -93,12 +93,6 @@ pub struct TokenClassificationOptions {
     pub ignore_labels: Vec<String>,
 }
 
-fn substring(s: &str, start: usize, end: usize) -> String {
-    s.char_indices()
-        .filter_map(|(i, c)| if i >= start && i < end { Some(c) } else { None })
-        .collect()
-}
-
 impl Default for TokenClassificationOptions {
     fn default() -> Self {
         Self {
@@ -106,6 +100,12 @@ impl Default for TokenClassificationOptions {
             ignore_labels: vec!["O".to_string()],
         }
     }
+}
+
+fn substring(s: &str, start: usize, end: usize) -> String {
+    s.char_indices()
+        .filter_map(|(i, c)| if i >= start && i < end { Some(c) } else { None })
+        .collect()
 }
 
 pub struct TokenClassificationPipeline {
@@ -496,17 +496,20 @@ impl TokenClassificationPipeline {
         Ok(entities)
     }
 
-    pub fn run_batch<'s, E>(
+    pub fn run_batch<I: AsRef<str>>(
         &self,
-        inputs: Vec<E>,
+        inputs: Vec<I>,
         options: Option<TokenClassificationOptions>,
-    ) -> Result<Vec<Vec<Entity>>>
-    where
-        E: Into<EncodeInput<'s>> + Send,
-    {
+    ) -> Result<Vec<Vec<Entity>>> {
         let options = options.unwrap_or_default();
-        let sentences = vec![];
-        let (input_ids, token_type_ids, encodings) = self.preprocess(inputs)?;
+        let mut sentences: Vec<String> = Vec::new();
+        let mut encoded_inputs: Vec<EncodeInput> = Vec::new();
+        for input in inputs {
+            let input_str = input.as_ref().to_string();
+            sentences.push(input_str.clone());
+            encoded_inputs.push(input_str.into());
+        }
+        let (input_ids, token_type_ids, encodings) = self.preprocess(encoded_inputs)?;
         let output = self.model.forward(&input_ids, &token_type_ids)?;
         self.postprocess(
             sentences,
