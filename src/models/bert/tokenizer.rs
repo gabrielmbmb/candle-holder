@@ -33,14 +33,17 @@ impl BertTokenizer {
             .unk_token
             .clone()
             .unwrap_or(BERT_UNK_TOKEN.to_string());
-        let cls_token = config
-            .cls_token
-            .clone()
-            .unwrap_or(BERT_CLS_TOKEN.to_string());
         let sep_token = config
             .sep_token
             .clone()
             .unwrap_or(BERT_SEP_TOKEN.to_string());
+        let cls_token = config
+            .cls_token
+            .clone()
+            .unwrap_or(BERT_CLS_TOKEN.to_string());
+
+        let cls_token_id = *vocab.get(&cls_token).unwrap_or(&101u32);
+        let sep_token_id = *vocab.get(&sep_token).unwrap_or(&102u32);
 
         let word_piece = WordPiece::builder()
             .vocab(vocab)
@@ -52,7 +55,7 @@ impl BertTokenizer {
             .unwrap()
             .try_pair(format!("{} $A {} $B:1 {}", cls_token, sep_token, sep_token))
             .unwrap()
-            .special_tokens(vec![(cls_token, 101), (sep_token, 102)])
+            .special_tokens(vec![(cls_token, cls_token_id), (sep_token, sep_token_id)])
             .build()
             .unwrap();
         let pre_tokenizer = BertPreTokenizer {};
