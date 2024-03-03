@@ -53,7 +53,10 @@ impl BertTokenizer {
         let post_processor = TemplateProcessing::builder()
             .try_single(format!("{} $A {}", cls_token, sep_token))
             .unwrap()
-            .try_pair(format!("{} $A {} $B:1 {}", cls_token, sep_token, sep_token))
+            .try_pair(format!(
+                "{} $A:0 {} $B:1 {}:1",
+                cls_token, sep_token, sep_token
+            ))
             .unwrap()
             .special_tokens(vec![(cls_token, cls_token_id), (sep_token, sep_token_id)])
             .build()
