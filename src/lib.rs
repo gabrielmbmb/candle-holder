@@ -20,3 +20,6 @@ pub use pipelines::text_classification::TextClassificationPipeline;
 pub use pipelines::token_classification::{
     AggregationStrategy, TokenClassificationOptions, TokenClassificationPipeline,
 };
+pub use pipelines::zero_shot_classification::{
+    ZeroShotClassificationOptions, ZeroShotClassificationPipeline,
+};
