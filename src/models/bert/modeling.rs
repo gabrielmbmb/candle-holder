@@ -1,10 +1,11 @@
 use crate::{config::PretrainedConfig, model::PreTrainedModel};
-use anyhow::Result;
-use candle_core::{DType, IndexOp, Module, Tensor};
+use anyhow::{Error, Result};
+use candle_core::{DType, IndexOp, Module, Tensor, D};
 use candle_nn::{
     embedding, layer_norm, linear, ops::softmax, Dropout, Embedding, LayerNorm, Linear, VarBuilder,
 };
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 pub const BERT_DTYPE: DType = DType::F32;
 
@@ -91,7 +92,7 @@ impl Default for BertConfig {
 }
 
 pub struct BertEmbeddings {
-    pub word_embeddings: Embedding,
+    pub word_embeddings: Arc<Embedding>,
     pub position_embeddings: Option<Embedding>,
     pub token_type_embeddings: Embedding,
     pub layer_norm: LayerNorm,
@@ -121,7 +122,7 @@ impl BertEmbeddings {
             vb.pp("LayerNorm"),
         )?;
         Ok(Self {
-            word_embeddings,
+            word_embeddings: Arc::new(word_embeddings),
             position_embeddings: Some(position_embeddings),
             token_type_embeddings,
             layer_norm,
@@ -391,10 +392,96 @@ impl Module for BertPooler {
     }
 }
 
+pub struct BertPredictionHeadTransform {
+    dense: Linear,
+    transform_act_fn: HiddenActLayer,
+    layer_norm: LayerNorm,
+}
+
+impl BertPredictionHeadTransform {
+    pub fn load(vb: VarBuilder, config: &BertConfig) -> Result<Self> {
+        let dense = linear(config.hidden_size, config.hidden_size, vb.pp("dense"))?;
+        let transform_act_fn = HiddenActLayer::new(config.hidden_act);
+        let layer_norm = layer_norm(
+            config.hidden_size,
+            config.layer_norm_eps,
+            vb.pp("LayerNorm"),
+        )?;
+        Ok(Self {
+            dense,
+            transform_act_fn,
+            layer_norm,
+        })
+    }
+}
+
+impl Module for BertPredictionHeadTransform {
+    fn forward(&self, hidden_states: &Tensor) -> candle_core::Result<Tensor> {
+        let hidden_states = self.dense.forward(hidden_states)?;
+        let hidden_states = self.transform_act_fn.forward(&hidden_states)?;
+        self.layer_norm.forward(&hidden_states)
+    }
+}
+
+pub struct BertLMPredictionHead {
+    transform: BertPredictionHeadTransform,
+    // The decoder weights are tied with the embeddings weights so the model only learns one
+    // representation
+    decoder_weight: Arc<Embedding>,
+    decoder_bias: Tensor,
+}
+
+impl BertLMPredictionHead {
+    pub fn load(
+        vb: VarBuilder,
+        decoder_weight: Arc<Embedding>,
+        config: &BertConfig,
+    ) -> Result<Self> {
+        let transform = BertPredictionHeadTransform::load(vb.pp("transform"), config)?;
+        let decoder_bias =
+            vb.get_with_hints((config.vocab_size,), "bias", candle_nn::Init::Const(0.))?;
+        Ok(Self {
+            transform,
+            decoder_weight,
+            decoder_bias,
+        })
+    }
+}
+
+impl Module for BertLMPredictionHead {
+    fn forward(&self, hidden_states: &Tensor) -> candle_core::Result<Tensor> {
+        let hidden_states = self.transform.forward(hidden_states)?;
+        hidden_states
+            .broadcast_matmul(&self.decoder_weight.embeddings().t()?)?
+            .broadcast_add(&self.decoder_bias)
+    }
+}
+
+pub struct BertOnlyMLMHead {
+    predictions: BertLMPredictionHead,
+}
+
+impl BertOnlyMLMHead {
+    pub fn load(
+        vb: VarBuilder,
+        decoder_weight: Arc<Embedding>,
+        config: &BertConfig,
+    ) -> Result<Self> {
+        let predictions = BertLMPredictionHead::load(vb.pp("predictions"), decoder_weight, config)?;
+        Ok(Self { predictions })
+    }
+}
+
+impl Module for BertOnlyMLMHead {
+    fn forward(&self, hidden_states: &Tensor) -> candle_core::Result<Tensor> {
+        self.predictions.forward(hidden_states)
+    }
+}
+
 pub struct Bert {
     embeddings: BertEmbeddings,
     encoder: BertEncoder,
-    pooler: BertPooler,
+    pooler: Option<BertPooler>,
 }
 
 impl Bert {
@@ -405,7 +492,17 @@ impl Bert {
         Ok(Self {
             embeddings,
             encoder,
-            pooler,
+            pooler: Some(pooler),
+        })
+    }
+
+    pub fn load_without_pooler(vb: VarBuilder, config: &BertConfig) -> Result<Self> {
+        let embeddings = BertEmbeddings::load(vb.pp("embeddings"), config)?;
+        let encoder = BertEncoder::load(vb.pp("encoder"), config)?;
+        Ok(Self {
+            embeddings,
+            encoder,
+            pooler: None,
         })
     }
 
@@ -419,10 +516,18 @@ impl Bert {
         Ok(sequence_output)
     }
 
-    pub fn forward(&self, input_ids: &Tensor, token_type_ids: &Tensor) -> Result<Tensor> {
-        let sequence_output = self.forward_return_sequence(input_ids, token_type_ids)?;
-        let pooled_output = self.pooler.forward(&sequence_output)?;
-        Ok(pooled_output)
+    pub fn forward(
+        &self,
+        input_ids: &Tensor,
+        token_type_ids: &Tensor,
+    ) -> Result<(Tensor, Option<Tensor>)> {
+        let embedding_output = self.embeddings.forward(input_ids, token_type_ids)?;
+        let sequence_output = self.encoder.forward(&embedding_output)?;
+        if let Some(pooler) = &self.pooler {
+            let pooled_output = pooler.forward(&sequence_output)?;
+            return Ok((sequence_output, Some(pooled_output)));
+        }
+        Ok((sequence_output, None))
     }
 }
 
@@ -439,7 +544,11 @@ impl PreTrainedModel for BertModel {
     }
 
     fn forward(&self, input_ids: &Tensor, token_type_ids: &Tensor) -> Result<Tensor> {
-        self.model.forward(input_ids, token_type_ids)
+        let (sequence_output, pooled_output) = self.model.forward(input_ids, token_type_ids)?;
+        if let Some(pooled_output) = pooled_output {
+            return Ok(pooled_output);
+        }
+        Ok(sequence_output)
     }
 
     fn config(&self) -> PretrainedConfig {
@@ -474,8 +583,8 @@ impl PreTrainedModel for BertForSequenceClassification {
     }
 
     fn forward(&self, input_ids: &Tensor, token_type_ids: &Tensor) -> Result<Tensor> {
-        let pooled_output = self.model.forward(input_ids, token_type_ids)?;
-        let pooled_output = self.dropout.forward(&pooled_output, false)?;
+        let (_, pooled_output) = self.model.forward(input_ids, token_type_ids)?;
+        let pooled_output = self.dropout.forward(&pooled_output.unwrap(), false)?;
         let logits = self.classifier.forward(&pooled_output)?;
         Ok(logits)
     }
@@ -517,6 +626,35 @@ impl PreTrainedModel for BertForTokenClassification {
             .forward_return_sequence(input_ids, token_type_ids)?;
         let sequence_output = self.dropout.forward(&sequence_output, false)?;
         let logits = self.classifier.forward(&sequence_output)?;
+        Ok(logits)
+    }
+
+    fn config(&self) -> PretrainedConfig {
+        self.config.pretrained_config.clone()
+    }
+}
+
+pub struct BertForMaskedLM {
+    model: Bert,
+    cls: BertOnlyMLMHead,
+    config: BertConfig,
+}
+
+impl PreTrainedModel for BertForMaskedLM {
+    fn load(vb: VarBuilder, config: serde_json::Value) -> Result<Self> {
+        let config: BertConfig = serde_json::from_value(config)?;
+        let model = Bert::load_without_pooler(vb.pp("bert"), &config)?;
+        let cls = BertOnlyMLMHead::load(
+            vb.pp("cls"),
+            model.embeddings.word_embeddings.clone(),
+            &config,
+        )?;
+        Ok(Self { model, cls, config })
+    }
+
+    fn forward(&self, input_ids: &Tensor, token_type_ids: &Tensor) -> Result<Tensor> {
+        let (sequence_output, _) = self.model.forward(input_ids, token_type_ids)?;
+        let logits = self.cls.forward(&sequence_output)?;
         Ok(logits)
     }
 
