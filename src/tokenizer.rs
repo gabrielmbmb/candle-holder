@@ -8,10 +8,10 @@ use anyhow::{bail, Error, Result};
 use candle_core::{Device, Tensor};
 use hf_hub::{api::sync::Api, Repo, RepoType};
 use lazy_static::lazy_static;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use tokenizers::{
     models::bpe::{Merges, Vocab},
-    Encoding, Tokenizer,
+    Encoding, Tokenizer as CoreTokenizer,
 };
 
 pub trait TensorEncoding {
@@ -46,11 +46,13 @@ const TOKENIZER_FILE: &str = "tokenizer.json";
 const VOCAB_TXT_FILE: &str = "vocab.txt";
 const VOCAB_JSON_FILE: &str = "vocab.json";
 const MERGES_FILE: &str = "merges.txt";
+const SPECIAL_TOKENS_MAP_FILE: &str = "special_tokens_map.json";
 
 lazy_static! {
     static ref MODEL_TYPE_TO_TOKENIZER_CLASS: HashMap<String, String> = {
         let mut map = HashMap::new();
         map.insert("bert".to_string(), "BertTokenizer".to_string());
+        map.insert("llama".to_string(), "LlamaTokenizer".to_string());
         map.insert("roberta".to_string(), "RobertaTokenizer".to_string());
         map
     };
@@ -85,6 +87,94 @@ pub fn load_merges(merges_file_path: std::path::PathBuf) -> Result<Merges> {
         },
     );
     Ok(merges)
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct SpecialToken {
+    content: String,
+    #[serde(default)]
+    lstrip: bool,
+    #[serde(default)]
+    normalized: bool,
+    #[serde(default)]
+    rstrip: bool,
+    #[serde(default)]
+    single_word: bool,
+}
+
+fn deserialize_special_token<'de, D>(deserializer: D) -> Result<Option<SpecialToken>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Deserialize::deserialize(deserializer).map(|v| {
+        if let serde_json::Value::String(s) = v {
+            Some(SpecialToken {
+                content: s,
+                lstrip: false,
+                normalized: false,
+                rstrip: false,
+                single_word: false,
+            })
+        } else {
+            serde_json::from_value(v).ok()
+        }
+    })
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SpecialTokensMap {
+    #[serde(deserialize_with = "deserialize_special_token", default)]
+    cls_token: Option<SpecialToken>,
+    #[serde(deserialize_with = "deserialize_special_token", default)]
+    mask_token: Option<SpecialToken>,
+    #[serde(deserialize_with = "deserialize_special_token", default)]
+    pad_token: Option<SpecialToken>,
+    #[serde(deserialize_with = "deserialize_special_token", default)]
+    sep_token: Option<SpecialToken>,
+    #[serde(deserialize_with = "deserialize_special_token", default)]
+    bos_token: Option<SpecialToken>,
+    #[serde(deserialize_with = "deserialize_special_token", default)]
+    eos_token: Option<SpecialToken>,
+    #[serde(deserialize_with = "deserialize_special_token", default)]
+    unk_token: Option<SpecialToken>,
+}
+
+impl SpecialTokensMap {
+    pub fn get_cls_token(&self) -> Option<String> {
+        self.cls_token.as_ref().map(|t| t.content.clone())
+    }
+
+    pub fn get_mask_token(&self) -> Option<String> {
+        self.mask_token.as_ref().map(|t| t.content.clone())
+    }
+
+    pub fn get_pad_token(&self) -> Option<String> {
+        self.pad_token.as_ref().map(|t| t.content.clone())
+    }
+
+    pub fn get_sep_token(&self) -> Option<String> {
+        self.sep_token.as_ref().map(|t| t.content.clone())
+    }
+
+    pub fn get_bos_token(&self) -> Option<String> {
+        self.bos_token.as_ref().map(|t| t.content.clone())
+    }
+
+    pub fn get_eos_token(&self) -> Option<String> {
+        self.eos_token.as_ref().map(|t| t.content.clone())
+    }
+
+    pub fn get_unk_token(&self) -> Option<String> {
+        self.unk_token.as_ref().map(|t| t.content.clone())
+    }
+}
+
+pub fn load_special_tokens_map(
+    special_tokens_map_file_path: std::path::PathBuf,
+) -> Result<SpecialTokensMap> {
+    let special_tokens_map = fs::read_to_string(special_tokens_map_file_path)?;
+    let special_tokens_map: SpecialTokensMap = serde_json::from_str(&special_tokens_map)?;
+    Ok(special_tokens_map)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -131,6 +221,7 @@ pub struct TokenizerInfo {
     pub tokenizer_file_path: Option<std::path::PathBuf>,
     pub vocab: Option<Vocab>,
     pub merges: Option<Merges>,
+    pub special_tokens_map: Option<SpecialTokensMap>,
 }
 
 impl TokenizerInfo {
@@ -140,6 +231,7 @@ impl TokenizerInfo {
         tokenizer_file_path: Option<std::path::PathBuf>,
         vocab: Option<Vocab>,
         merges: Option<Merges>,
+        special_tokens_map: Option<SpecialTokensMap>,
     ) -> Self {
         TokenizerInfo {
             config,
@@ -147,12 +239,13 @@ impl TokenizerInfo {
             tokenizer_file_path,
             vocab,
             merges,
+            special_tokens_map,
         }
     }
 
-    pub fn get_tokenizer(&self) -> Result<Tokenizer> {
+    pub fn get_tokenizer(&self) -> Result<CoreTokenizer> {
         if let Some(tokenizer_file_path) = &self.tokenizer_file_path {
-            return Ok(Tokenizer::from_file(tokenizer_file_path).map_err(Error::msg)?);
+            return CoreTokenizer::from_file(tokenizer_file_path).map_err(Error::msg);
         }
 
         Err(Error::msg("Could not load tokenizer"))
@@ -231,12 +324,19 @@ pub fn from_pretrained<I: AsRef<str>>(
         Err(_) => None,
     };
 
+    // Try to load `special_tokens_map.json`
+    let special_tokens_map = match api.get(SPECIAL_TOKENS_MAP_FILE) {
+        Ok(special_tokens_map_file) => load_special_tokens_map(special_tokens_map_file).ok(),
+        Err(_) => None,
+    };
+
     Ok(TokenizerInfo::new(
         tokenizer_config,
         model_config,
         tokenizer_file_path,
         vocab,
         merges,
+        special_tokens_map,
     ))
 }
 
@@ -247,7 +347,7 @@ pub struct AutoTokenizer {}
 macro_rules! impl_auto_tokenizer_from_pretrained_method {
     ($auto_tokenizer_struct:ident, $(($tokenizer_class:expr, $tokenizer_struct:ident)), *) => {
         impl $auto_tokenizer_struct {
-            pub fn from_pretrained<S: AsRef<str>>(repo_id: S, params: Option<FromPretrainedParameters>) -> Result<Tokenizer> {
+            pub fn from_pretrained<S: AsRef<str>>(repo_id: S, params: Option<FromPretrainedParameters>) -> Result<CoreTokenizer> {
                 let tokenizer_info = from_pretrained(repo_id, params)?;
 
                 let tokenizer = match tokenizer_info.get_tokenizer_class() {
@@ -276,7 +376,7 @@ macro_rules! impl_tokenizer_from_pretrained_method {
             pub fn from_pretrained<S: AsRef<str>>(
                 repo_id: S,
                 params: Option<FromPretrainedParameters>,
-            ) -> Result<Tokenizer> {
+            ) -> Result<CoreTokenizer> {
                 let tokenizer_info = from_pretrained(repo_id, params)?;
                 $tokenizer_struct::from_tokenizer_info(tokenizer_info)
             }
