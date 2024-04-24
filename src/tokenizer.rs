@@ -371,14 +371,6 @@ impl TokenizerInfo {
         }
     }
 
-    pub fn get_tokenizer(&self) -> Result<CoreTokenizer> {
-        if let Some(tokenizer_file_path) = &self.tokenizer_file_path {
-            return CoreTokenizer::from_file(tokenizer_file_path).map_err(Error::msg);
-        }
-
-        Err(Error::msg("Could not load tokenizer"))
-    }
-
     pub fn get_tokenizer_class(&self) -> &str {
         if let Some(config) = &self.config {
             if let Some(tokenizer_class) = &config.tokenizer_class {
