@@ -2,10 +2,10 @@ use std::collections::HashMap;
 
 use anyhow::{Error, Result};
 use candle_core::{Device, IndexOp, Tensor, D};
-use tokenizers::{EncodeInput, Encoding, Tokenizer};
+use tokenizers::{EncodeInput, Encoding};
 
 use crate::{
-    model::PreTrainedModel, AutoModelForTokenClassification, AutoTokenizer,
+    model::PreTrainedModel, tokenizer::Tokenizer, AutoModelForTokenClassification, AutoTokenizer,
     FromPretrainedParameters,
 };
 
@@ -112,7 +112,7 @@ fn substring(s: &str, start: usize, end: usize) -> String {
 
 pub struct TokenClassificationPipeline {
     model: Box<dyn PreTrainedModel>,
-    tokenizer: Tokenizer,
+    tokenizer: Box<dyn Tokenizer>,
     device: Device,
     id2label: HashMap<usize, String>,
 }
@@ -201,6 +201,7 @@ impl TokenClassificationPipeline {
             .collect::<Vec<u32>>();
         let word = self
             .tokenizer
+            .get_tokenizer()
             .decode(&token_ids[..], true)
             .map_err(Error::msg)?;
         let first_entity = pre_entities.first().unwrap().clone();
@@ -334,6 +335,7 @@ impl TokenClassificationPipeline {
             .collect::<Vec<u32>>();
         let word = self
             .tokenizer
+            .get_tokenizer()
             .decode(&token_ids[..], true)
             .map_err(Error::msg)?;
         Ok(Entity::new(

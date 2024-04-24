@@ -2,11 +2,11 @@ use anyhow::{Error, Result};
 use candle_core::{Device, IndexOp, Tensor, D};
 use candle_nn::ops::softmax;
 use dyn_fmt::AsStrFormatExt;
-use tokenizers::{EncodeInput, Tokenizer};
+use tokenizers::EncodeInput;
 
 use crate::{
-    model::PreTrainedModel, AutoModelForSequenceClassification, AutoTokenizer,
-    FromPretrainedParameters,
+    model::PreTrainedModel, tokenizer::Tokenizer, AutoModelForSequenceClassification,
+    AutoTokenizer, FromPretrainedParameters,
 };
 
 use super::utils::get_encodings;
@@ -29,7 +29,7 @@ impl Default for ZeroShotClassificationOptions {
 
 pub struct ZeroShotClassificationPipeline {
     model: Box<dyn PreTrainedModel>,
-    tokenizer: Tokenizer,
+    tokenizer: Box<dyn Tokenizer>,
     device: Device,
     num_labels: usize,
     entailment_id: i8,

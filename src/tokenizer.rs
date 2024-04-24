@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fs};
 
 use crate::{
-    models::{bert::BertTokenizer, roberta::tokenizer::RobertaTokenizer},
+    models::bert::{BertTokenizer, BertTokenizerBuilder},
     FromPretrainedParameters,
 };
 use anyhow::{bail, Error, Result};
@@ -11,7 +11,7 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Deserializer, Serialize};
 use tokenizers::{
     models::bpe::{Merges, Vocab},
-    Encoding, Tokenizer as CoreTokenizer,
+    EncodeInput, Encoding, Tokenizer as CoreTokenizer,
 };
 
 pub trait TensorEncoding {
@@ -58,25 +58,25 @@ lazy_static! {
     };
 }
 
-pub fn load_vocab_txt(vocab_txt_file_path: std::path::PathBuf) -> Result<Vocab> {
-    let vocab = fs::read_to_string(vocab_txt_file_path)?
-        .lines()
-        .enumerate()
-        .fold(HashMap::<String, u32>::new(), |mut map, (idx, line)| {
+pub fn load_vocab_txt(file_path: std::path::PathBuf) -> Result<Vocab> {
+    let vocab = fs::read_to_string(file_path)?.lines().enumerate().fold(
+        HashMap::<String, u32>::new(),
+        |mut map, (idx, line)| {
             map.insert(line.to_string(), idx as u32);
             map
-        });
+        },
+    );
     Ok(vocab)
 }
 
-pub fn load_vocab_json(vocab_json_file_path: std::path::PathBuf) -> Result<Vocab> {
-    let vocab = fs::read_to_string(vocab_json_file_path)?;
+pub fn load_vocab_json(file_path: std::path::PathBuf) -> Result<Vocab> {
+    let vocab = fs::read_to_string(file_path)?;
     let vocab: Vocab = serde_json::from_str(vocab.as_str())?;
     Ok(vocab)
 }
 
-pub fn load_merges(merges_file_path: std::path::PathBuf) -> Result<Merges> {
-    let merges = fs::read_to_string(merges_file_path)?.lines().skip(1).fold(
+pub fn load_merges(file_path: std::path::PathBuf) -> Result<Merges> {
+    let merges = fs::read_to_string(file_path)?.lines().skip(1).fold(
         Vec::<(String, String)>::new(),
         |mut vec, line| {
             let line = line.to_string();
@@ -169,10 +169,8 @@ impl SpecialTokensMap {
     }
 }
 
-pub fn load_special_tokens_map(
-    special_tokens_map_file_path: std::path::PathBuf,
-) -> Result<SpecialTokensMap> {
-    let special_tokens_map = fs::read_to_string(special_tokens_map_file_path)?;
+pub fn load_special_tokens_map(file_path: std::path::PathBuf) -> Result<SpecialTokensMap> {
+    let special_tokens_map = fs::read_to_string(file_path)?;
     let special_tokens_map: SpecialTokensMap = serde_json::from_str(&special_tokens_map)?;
     Ok(special_tokens_map)
 }
@@ -189,9 +187,13 @@ pub struct AddedToken {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TokenizerConfig {
+    pub add_prefix_space: Option<bool>,
     pub added_tokens_decoder: Option<HashMap<String, AddedToken>>,
+    pub bos_token: Option<String>,
     pub clean_up_tokenization_spaces: Option<bool>,
     pub cls_token: Option<String>,
+    pub eos_token: Option<String>,
+    pub errors: Option<String>,
     pub do_basic_tokenize: Option<bool>,
     pub do_lower_case: Option<bool>,
     pub mask_token: Option<String>,
@@ -222,6 +224,132 @@ pub struct TokenizerInfo {
     pub vocab: Option<Vocab>,
     pub merges: Option<Merges>,
     pub special_tokens_map: Option<SpecialTokensMap>,
+}
+
+pub enum SpecialTokenName {
+    Cls,
+    Mask,
+    Pad,
+    Sep,
+    Bos,
+    Eos,
+    Unk,
+}
+
+impl TokenizerInfo {
+    pub fn get_cls_token(&self) -> Option<String> {
+        self.get_special_token(SpecialTokenName::Cls)
+    }
+
+    pub fn get_mask_token(&self) -> Option<String> {
+        self.get_special_token(SpecialTokenName::Mask)
+    }
+
+    pub fn get_pad_token(&self) -> Option<String> {
+        self.get_special_token(SpecialTokenName::Pad)
+    }
+
+    pub fn get_sep_token(&self) -> Option<String> {
+        self.get_special_token(SpecialTokenName::Sep)
+    }
+
+    pub fn get_bos_token(&self) -> Option<String> {
+        self.get_special_token(SpecialTokenName::Bos)
+    }
+
+    pub fn get_eos_token(&self) -> Option<String> {
+        self.get_special_token(SpecialTokenName::Eos)
+    }
+
+    pub fn get_unk_token(&self) -> Option<String> {
+        self.get_special_token(SpecialTokenName::Unk)
+    }
+
+    fn get_special_token(&self, special_token_name: SpecialTokenName) -> Option<String> {
+        // First, try from special tokens map
+        if let Some(special_tokens_map) = &self.special_tokens_map {
+            match special_token_name {
+                SpecialTokenName::Cls => {
+                    if let Some(cls_token) = &special_tokens_map.cls_token {
+                        return Some(cls_token.content.clone());
+                    }
+                }
+                SpecialTokenName::Mask => {
+                    if let Some(mask_token) = &special_tokens_map.mask_token {
+                        return Some(mask_token.content.clone());
+                    }
+                }
+                SpecialTokenName::Pad => {
+                    if let Some(pad_token) = &special_tokens_map.pad_token {
+                        return Some(pad_token.content.clone());
+                    }
+                }
+                SpecialTokenName::Sep => {
+                    if let Some(sep_token) = &special_tokens_map.sep_token {
+                        return Some(sep_token.content.clone());
+                    }
+                }
+                SpecialTokenName::Bos => {
+                    if let Some(bos_token) = &special_tokens_map.bos_token {
+                        return Some(bos_token.content.clone());
+                    }
+                }
+                SpecialTokenName::Eos => {
+                    if let Some(eos_token) = &special_tokens_map.eos_token {
+                        return Some(eos_token.content.clone());
+                    }
+                }
+                SpecialTokenName::Unk => {
+                    if let Some(unk_token) = &special_tokens_map.unk_token {
+                        return Some(unk_token.content.clone());
+                    }
+                }
+            }
+        }
+
+        // Then, try from config file
+        if let Some(config) = &self.config {
+            match special_token_name {
+                SpecialTokenName::Cls => {
+                    if let Some(cls_token) = &config.cls_token {
+                        return Some(cls_token.clone());
+                    }
+                }
+                SpecialTokenName::Mask => {
+                    if let Some(mask_token) = &config.mask_token {
+                        return Some(mask_token.clone());
+                    }
+                }
+                SpecialTokenName::Pad => {
+                    if let Some(pad_token) = &config.pad_token {
+                        return Some(pad_token.clone());
+                    }
+                }
+                SpecialTokenName::Sep => {
+                    if let Some(sep_token) = &config.sep_token {
+                        return Some(sep_token.clone());
+                    }
+                }
+                SpecialTokenName::Bos => {
+                    if let Some(bos_token) = &config.bos_token {
+                        return Some(bos_token.clone());
+                    }
+                }
+                SpecialTokenName::Eos => {
+                    if let Some(eos_token) = &config.eos_token {
+                        return Some(eos_token.clone());
+                    }
+                }
+                SpecialTokenName::Unk => {
+                    if let Some(unk_token) = &config.unk_token {
+                        return Some(unk_token.clone());
+                    }
+                }
+            }
+        }
+
+        None
+    }
 }
 
 impl TokenizerInfo {
@@ -267,6 +395,40 @@ impl TokenizerInfo {
         }
 
         ""
+    }
+}
+
+pub trait Tokenizer {
+    fn get_tokenizer(&self) -> &CoreTokenizer;
+    fn get_mask_token(&self) -> String {
+        unimplemented!("get_mask_token method not implemented")
+    }
+}
+
+pub trait TokenizerBuilder<T: Tokenizer> {
+    fn new(tokenizer_info: TokenizerInfo) -> Self;
+    fn get_tokenizer_info(&self) -> &TokenizerInfo;
+
+    fn build_tokenizer(&mut self) -> Result<CoreTokenizer> {
+        unimplemented!("build_tokenizer method not implemented")
+    }
+
+    fn build_with_tokenizer(&self, _tokenizer: CoreTokenizer) -> Result<T> {
+        unimplemented!("with_tokenizer method not implemented")
+    }
+
+    fn build(&mut self) -> Result<T> {
+        let tokenizer_info = self.get_tokenizer_info();
+
+        // Try first to build from `tokenizer.json`
+        if let Some(tokenizer_file_path) = &tokenizer_info.tokenizer_file_path {
+            let tokenizer = CoreTokenizer::from_file(tokenizer_file_path).map_err(Error::msg)?;
+            return self.build_with_tokenizer(tokenizer);
+        }
+
+        // Try to build from `vocab.txt`, `vocab.json` and `merges.txt`
+        let tokenizer = self.build_tokenizer()?;
+        self.build_with_tokenizer(tokenizer)
     }
 }
 
@@ -340,24 +502,25 @@ pub fn from_pretrained<I: AsRef<str>>(
     ))
 }
 
-pub trait PreTrainedTokenizer {}
-
 pub struct AutoTokenizer {}
 
 macro_rules! impl_auto_tokenizer_from_pretrained_method {
-    ($auto_tokenizer_struct:ident, $(($tokenizer_class:expr, $tokenizer_struct:ident)), *) => {
+    ($auto_tokenizer_struct:ident, $(($tokenizer_class:expr, $tokenizer_struct:ident, $tokenizer_builder_struct:ident)), *) => {
         impl $auto_tokenizer_struct {
-            pub fn from_pretrained<S: AsRef<str>>(repo_id: S, params: Option<FromPretrainedParameters>) -> Result<CoreTokenizer> {
+            pub fn from_pretrained<S: AsRef<str>>(
+                repo_id: S,
+                params: Option<FromPretrainedParameters>
+            ) -> Result<Box<dyn Tokenizer>> {
                 let tokenizer_info = from_pretrained(repo_id, params)?;
 
                 let tokenizer = match tokenizer_info.get_tokenizer_class() {
                     $(
-                        $tokenizer_class => $tokenizer_struct::from_tokenizer_info(tokenizer_info),
+                        $tokenizer_class => $tokenizer_builder_struct::new(tokenizer_info).build()?,
                     )*
                     _ => bail!(format!("Could not determine tokenizer class")),
                 };
 
-                tokenizer
+                Ok(Box::new(tokenizer))
             }
         }
     };
@@ -365,23 +528,23 @@ macro_rules! impl_auto_tokenizer_from_pretrained_method {
 
 impl_auto_tokenizer_from_pretrained_method!(
     AutoTokenizer,
-    ("BertTokenizer", BertTokenizer),
-    ("RobertaTokenizer", RobertaTokenizer)
+    ("BertTokenizer", BertTokenizer, BertTokenizerBuilder)
 );
 
 // Implement `from_pretrained` method for each tokenizer
 macro_rules! impl_tokenizer_from_pretrained_method {
-    ($tokenizer_struct:ident) => {
+    ($tokenizer_struct:ident, $tokenizer_builder_struct:ident) => {
         impl $tokenizer_struct {
             pub fn from_pretrained<S: AsRef<str>>(
                 repo_id: S,
                 params: Option<FromPretrainedParameters>,
-            ) -> Result<CoreTokenizer> {
+            ) -> Result<Box<dyn Tokenizer>> {
                 let tokenizer_info = from_pretrained(repo_id, params)?;
-                $tokenizer_struct::from_tokenizer_info(tokenizer_info)
+                let tokenizer = $tokenizer_builder_struct::new(tokenizer_info).build()?;
+                Ok(Box::new(tokenizer))
             }
         }
     };
 }
 
-impl_tokenizer_from_pretrained_method!(BertTokenizer);
+impl_tokenizer_from_pretrained_method!(BertTokenizer, BertTokenizerBuilder);

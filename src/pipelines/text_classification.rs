@@ -1,18 +1,18 @@
 use anyhow::{Error, Result};
 use candle_core::{Device, Tensor, D};
 use candle_nn::ops::{sigmoid, softmax};
-use tokenizers::{EncodeInput, Tokenizer};
+use tokenizers::EncodeInput;
 
 use crate::{
-    config::ProblemType, model::PreTrainedModel, utils::FromPretrainedParameters,
-    AutoModelForSequenceClassification, AutoTokenizer,
+    config::ProblemType, model::PreTrainedModel, tokenizer::Tokenizer,
+    utils::FromPretrainedParameters, AutoModelForSequenceClassification, AutoTokenizer,
 };
 
 use super::utils::get_encodings;
 
 pub struct TextClassificationPipeline {
     model: Box<dyn PreTrainedModel>,
-    tokenizer: Tokenizer,
+    tokenizer: Box<dyn Tokenizer>,
     device: Device,
 }
 

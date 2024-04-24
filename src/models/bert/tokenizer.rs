@@ -1,69 +1,107 @@
-use std::collections::HashMap;
-
-use crate::tokenizer;
+use crate::tokenizer::{Tokenizer, TokenizerBuilder, TokenizerConfig, TokenizerInfo};
 use anyhow::{Error, Result};
 use tokenizers::models::bpe::Vocab;
+use tokenizers::models::wordpiece::WordPiece;
 use tokenizers::normalizers::BertNormalizer;
 use tokenizers::{
     decoders::wordpiece::WordPiece as WordPieceDecoder, pre_tokenizers::bert::BertPreTokenizer,
-    processors::template::TemplateProcessing, TokenizerImpl,
+    processors::template::TemplateProcessing, Tokenizer as CoreTokenizer, TokenizerImpl,
 };
-use tokenizers::{PaddingParams, Tokenizer};
 
-use tokenizers::models::wordpiece::WordPiece;
-
-const BERT_UNK_TOKEN: &str = "[UNK]";
-const BERT_SEP_TOKEN: &str = "[SEP]";
-const BERT_PAD_TOKEN: &str = "[PAD]";
 const BERT_CLS_TOKEN: &str = "[CLS]";
+const BERT_MASK_TOKEN: &str = "[MASK]";
+const BERT_PAD_TOKEN: &str = "[PAD]";
+const BERT_SEP_TOKEN: &str = "[SEP]";
+const BERT_UNK_TOKEN: &str = "[UNK]";
 
-impl From<tokenizer::TokenizerConfig> for BertNormalizer {
-    fn from(config: tokenizer::TokenizerConfig) -> Self {
-        let strip_accents = config.strip_accents;
-        let lowercase = config.do_lower_case.unwrap_or(false);
-        BertNormalizer::new(true, true, strip_accents, lowercase)
+pub struct BertTokenizer {
+    tokenizer: CoreTokenizer,
+    cls_token: String,
+    mask_token: String,
+    pad_token: String,
+    sep_token: String,
+    unk_token: String,
+}
+
+impl Tokenizer for BertTokenizer {
+    fn get_tokenizer(&self) -> &CoreTokenizer {
+        &self.tokenizer
     }
 }
 
-pub struct BertTokenizer {}
+pub struct BertTokenizerBuilder {
+    tokenizer_info: TokenizerInfo,
+}
 
-impl BertTokenizer {
-    pub fn from_vocab(vocab: Vocab, config: tokenizer::TokenizerConfig) -> Tokenizer {
-        let unk_token = config
-            .unk_token
-            .clone()
-            .unwrap_or(BERT_UNK_TOKEN.to_string());
-        let sep_token = config
-            .sep_token
-            .clone()
-            .unwrap_or(BERT_SEP_TOKEN.to_string());
-        let cls_token = config
-            .cls_token
-            .clone()
-            .unwrap_or(BERT_CLS_TOKEN.to_string());
+impl BertTokenizerBuilder {
+    fn build_normalizer(&self, config: &TokenizerConfig) -> BertNormalizer {
+        BertNormalizer::from(config)
+    }
 
-        let cls_token_id = *vocab.get(&cls_token).unwrap_or(&101u32);
-        let sep_token_id = *vocab.get(&sep_token).unwrap_or(&102u32);
+    fn build_pre_tokenizer(&self) -> BertPreTokenizer {
+        BertPreTokenizer {}
+    }
 
-        let word_piece = WordPiece::builder()
+    fn build_model(&self, vocab: Vocab, unk_token: String) -> Result<WordPiece> {
+        WordPiece::builder()
             .vocab(vocab)
             .unk_token(unk_token)
             .build()
-            .unwrap();
-        let post_processor = TemplateProcessing::builder()
-            .try_single(format!("{} $A {}", cls_token, sep_token))
-            .unwrap()
+            .map_err(Error::msg)
+    }
+
+    fn build_post_processor(
+        &self,
+        sep_token: (String, u32),
+        cls_token: (String, u32),
+    ) -> Result<TemplateProcessing> {
+        TemplateProcessing::builder()
+            .try_single(format!("{} $A {}", cls_token.0, sep_token.0))
+            .map_err(Error::msg)?
             .try_pair(format!(
                 "{} $A:0 {} $B:1 {}:1",
-                cls_token, sep_token, sep_token
+                cls_token.0, sep_token.0, sep_token.0
             ))
-            .unwrap()
-            .special_tokens(vec![(cls_token, cls_token_id), (sep_token, sep_token_id)])
+            .map_err(Error::msg)?
+            .special_tokens(vec![cls_token, sep_token])
             .build()
-            .unwrap();
-        let pre_tokenizer = BertPreTokenizer {};
-        let normalizer = BertNormalizer::from(config);
-        let decoder = WordPieceDecoder::default();
+            .map_err(Error::msg)
+    }
+
+    fn build_decoder(&self) -> WordPieceDecoder {
+        WordPieceDecoder::default()
+    }
+}
+
+impl TokenizerBuilder<BertTokenizer> for BertTokenizerBuilder {
+    fn new(tokenizer_info: TokenizerInfo) -> Self {
+        BertTokenizerBuilder { tokenizer_info }
+    }
+
+    fn get_tokenizer_info(&self) -> &TokenizerInfo {
+        &self.tokenizer_info
+    }
+
+    fn build_tokenizer(&mut self) -> Result<CoreTokenizer> {
+        let vocab = self
+            .tokenizer_info
+            .vocab
+            .take()
+            .ok_or_else(|| Error::msg("Cannot build BertTokenizer without 'vocab.txt'."))?;
+        let cls_token = self
+            .tokenizer_info
+            .get_cls_token()
+            .unwrap_or(BERT_CLS_TOKEN.to_string());
+        let sep_token = self
+            .tokenizer_info
+            .get_sep_token()
+            .unwrap_or(BERT_SEP_TOKEN.to_string());
+        let unk_token = self
+            .tokenizer_info
+            .get_unk_token()
+            .unwrap_or(BERT_UNK_TOKEN.to_string());
+        let cls_token_id = *vocab.get(&cls_token).unwrap_or(&101u32);
+        let sep_token_id = *vocab.get(&sep_token).unwrap_or(&102u32);
 
         let mut tokenizer: TokenizerImpl<
             WordPiece,
@@ -71,31 +109,63 @@ impl BertTokenizer {
             BertPreTokenizer,
             TemplateProcessing,
             WordPieceDecoder,
-        > = TokenizerImpl::new(word_piece);
+        > = TokenizerImpl::new(self.build_model(vocab, unk_token.clone())?);
+
+        let tokenizer_config = self
+            .tokenizer_info
+            .config
+            .as_ref()
+            .ok_or_else(|| Error::msg("Cannot build BertTokenizer without configuration."))?;
 
         tokenizer
-            .with_normalizer(normalizer)
-            .with_pre_tokenizer(pre_tokenizer)
-            .with_post_processor(post_processor)
-            .with_decoder(decoder)
-            // TODO: build padding from config
-            .with_padding(Some(PaddingParams::default()));
+            .with_normalizer(self.build_normalizer(tokenizer_config))
+            .with_pre_tokenizer(self.build_pre_tokenizer())
+            .with_post_processor(self.build_post_processor(
+                (sep_token.clone(), sep_token_id),
+                (cls_token.clone(), cls_token_id),
+            )?)
+            .with_decoder(self.build_decoder());
 
-        Tokenizer::from(tokenizer)
+        Ok(CoreTokenizer::from(tokenizer))
     }
 
-    pub fn from_tokenizer_info(tokenizer_info: tokenizer::TokenizerInfo) -> Result<Tokenizer> {
-        if let Some(tokenizer) = tokenizer_info.tokenizer_file_path {
-            return Tokenizer::from_file(tokenizer).map_err(Error::msg);
-        }
+    fn build_with_tokenizer(&self, tokenizer: CoreTokenizer) -> Result<BertTokenizer> {
+        let cls_token = self
+            .tokenizer_info
+            .get_cls_token()
+            .unwrap_or(BERT_CLS_TOKEN.to_string());
+        let mask_token = self
+            .tokenizer_info
+            .get_mask_token()
+            .unwrap_or(BERT_MASK_TOKEN.to_string());
+        let pad_token = self
+            .tokenizer_info
+            .get_pad_token()
+            .unwrap_or(BERT_PAD_TOKEN.to_string());
+        let sep_token = self
+            .tokenizer_info
+            .get_sep_token()
+            .unwrap_or(BERT_SEP_TOKEN.to_string());
+        let unk_token = self
+            .tokenizer_info
+            .get_unk_token()
+            .unwrap_or(BERT_UNK_TOKEN.to_string());
 
-        let vocab = tokenizer_info
-            .vocab
-            .ok_or_else(|| Error::msg("Could not build BertTokenizer because vocab is missing"))?;
-        let config = tokenizer_info.config.ok_or_else(|| {
-            Error::msg("Could not build BertTokenizer because tokenizer config is missing")
-        })?;
+        Ok(BertTokenizer {
+            tokenizer: CoreTokenizer::from(tokenizer),
+            cls_token,
+            mask_token,
+            pad_token,
+            sep_token,
+            unk_token,
+        })
+    }
+}
 
-        Ok(BertTokenizer::from_vocab(vocab, config))
+impl From<&TokenizerConfig> for BertNormalizer {
+    fn from(config: &TokenizerConfig) -> Self {
+        let strip_accents = config.strip_accents;
+        let lowercase = config.do_lower_case.unwrap_or(false);
+        BertNormalizer::new(true, true, strip_accents, lowercase)
     }
 }

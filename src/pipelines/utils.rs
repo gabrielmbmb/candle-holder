@@ -1,16 +1,21 @@
 use anyhow::{Error, Result};
 use candle_core::{Device, Tensor};
-use tokenizers::{EncodeInput, Encoding, Tokenizer};
+use tokenizers::{EncodeInput, Encoding};
+
+use crate::tokenizer::Tokenizer;
 
 pub fn get_encodings<'s, E>(
     inputs: Vec<E>,
-    tokenizer: &Tokenizer,
+    tokenizer: &Box<dyn Tokenizer>,
     device: &Device,
 ) -> Result<(Tensor, Tensor, Vec<Encoding>)>
 where
     E: Into<EncodeInput<'s>> + Send,
 {
-    let encodings = tokenizer.encode_batch(inputs, true).map_err(Error::msg)?;
+    let encodings = tokenizer
+        .get_tokenizer()
+        .encode_batch(inputs, true)
+        .map_err(Error::msg)?;
 
     let mut input_ids: Vec<Vec<u32>> = Vec::new();
     let mut token_type_ids: Vec<Vec<u32>> = Vec::new();
