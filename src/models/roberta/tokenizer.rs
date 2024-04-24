@@ -143,7 +143,7 @@ impl TokenizerBuilder<RobertaTokenizer> for RobertaTokenizerBuilder {
             .unwrap_or(ROBERTA_UNK_TOKEN.to_string());
 
         Ok(RobertaTokenizer {
-            tokenizer: CoreTokenizer::from(tokenizer),
+            tokenizer,
             bos_token,
             cls_token,
             eos_token,

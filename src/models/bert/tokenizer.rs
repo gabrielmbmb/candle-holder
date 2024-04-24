@@ -152,7 +152,7 @@ impl TokenizerBuilder<BertTokenizer> for BertTokenizerBuilder {
             .unwrap_or(BERT_UNK_TOKEN.to_string());
 
         Ok(BertTokenizer {
-            tokenizer: CoreTokenizer::from(tokenizer),
+            tokenizer,
             cls_token,
             mask_token,
             pad_token,
