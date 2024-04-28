@@ -1,11 +1,12 @@
-use anyhow::{Error, Result};
+use anyhow::{Error, Ok, Result};
 use candle_core::{Device, IndexOp, Tensor, D};
 use candle_nn::ops::softmax;
 use dyn_fmt::AsStrFormatExt;
 
 use crate::{
-    model::PreTrainedModel, tokenizer::Tokenizer, AutoModelForSequenceClassification,
-    AutoTokenizer, FromPretrainedParameters,
+    model::PreTrainedModel,
+    tokenizer::{BatchEncoding, Tokenizer},
+    AutoModelForSequenceClassification, AutoTokenizer, FromPretrainedParameters, Padding,
 };
 
 use super::utils::get_encodings;
@@ -67,19 +68,21 @@ impl ZeroShotClassificationPipeline {
     }
 
     fn preprocess(
-        &self,
+        &mut self,
         sentences: Vec<String>,
         candidate_labels: &[String],
         options: &ZeroShotClassificationOptions,
-    ) -> Result<(Tensor, Tensor)> {
+    ) -> Result<BatchEncoding> {
         let sequence_pairs = self.generate_sequence_pairs(
             sentences,
             candidate_labels,
             &options.hypothesis_template,
         )?;
-        let (input_ids, token_type_ids, _) =
-            get_encodings(sequence_pairs.clone(), &self.tokenizer, &self.device)?;
-        Ok((input_ids, token_type_ids))
+        let mut encodings = self
+            .tokenizer
+            .encode_sequence_pairs(sequence_pairs, Some(Padding::Longest))?;
+        encodings.to_device(&self.device)?;
+        Ok(encodings)
     }
 
     fn postprocess(
@@ -155,44 +158,42 @@ impl ZeroShotClassificationPipeline {
         Ok(sequence_pairs)
     }
 
-    pub fn run<I: AsRef<str>>(
-        &self,
+    pub fn run<I: Into<String>, L: AsRef<str>>(
+        &mut self,
         input: I,
-        candidate_labels: Vec<I>,
+        candidate_labels: Vec<L>,
         options: Option<ZeroShotClassificationOptions>,
     ) -> Result<Vec<(String, f32)>> {
         let options = options.unwrap_or_default();
-        let sentences = vec![input.as_ref().to_string()];
+        let inputs = vec![input.into()];
         let candidate_labels: Vec<String> = candidate_labels
             .into_iter()
             .map(|label| label.as_ref().to_string())
             .collect();
-        let (input_ids, token_type_ids) =
-            self.preprocess(sentences, &candidate_labels, &options)?;
-        let output = self.model.forward(&input_ids, &token_type_ids)?;
+        let encodings = self.preprocess(inputs, &candidate_labels, &options)?;
+        let output = self
+            .model
+            .forward(encodings.get_input_ids(), encodings.get_token_type_ids())?;
         Ok(self.postprocess(output, 1, &candidate_labels, options.multi_label)?[0].clone())
     }
 
-    pub fn run_batch<I: AsRef<str>>(
-        &self,
+    pub fn run_batch<I: Into<String>, L: AsRef<str>>(
+        &mut self,
         inputs: Vec<I>,
-        candidate_labels: Vec<I>,
+        candidate_labels: Vec<L>,
         options: Option<ZeroShotClassificationOptions>,
     ) -> Result<Vec<Vec<(String, f32)>>> {
         let options = options.unwrap_or_default();
-        let mut sentences: Vec<String> = Vec::new();
-        for input in inputs {
-            let input_str = input.as_ref().to_string();
-            sentences.push(input_str.clone());
-        }
-        let num_sequences = sentences.len();
+        let inputs: Vec<String> = inputs.into_iter().map(|x| x.into()).collect();
+        let num_sequences = inputs.len();
         let candidate_labels: Vec<String> = candidate_labels
             .into_iter()
             .map(|label| label.as_ref().to_string())
             .collect();
-        let (input_ids, token_type_ids) =
-            self.preprocess(sentences, &candidate_labels, &options)?;
-        let output = self.model.forward(&input_ids, &token_type_ids)?;
+        let encodings = self.preprocess(inputs, &candidate_labels, &options)?;
+        let output = self
+            .model
+            .forward(encodings.get_input_ids(), encodings.get_token_type_ids())?;
         self.postprocess(
             output,
             num_sequences,

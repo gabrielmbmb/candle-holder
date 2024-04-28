@@ -401,13 +401,15 @@ pub enum Padding {
 pub struct BatchEncoding {
     input_ids: Tensor,
     token_type_ids: Tensor,
+    encodings: Vec<Encoding>,
 }
 
 impl BatchEncoding {
-    pub fn new(input_ids: Tensor, token_type_ids: Tensor) -> Self {
+    pub fn new(input_ids: Tensor, token_type_ids: Tensor, encodings: Vec<Encoding>) -> Self {
         BatchEncoding {
             input_ids,
             token_type_ids,
+            encodings,
         }
     }
 
@@ -417,6 +419,10 @@ impl BatchEncoding {
 
     pub fn get_token_type_ids(&self) -> &Tensor {
         &self.token_type_ids
+    }
+
+    pub fn get_encodings(&self) -> &Vec<Encoding> {
+        &self.encodings
     }
 
     pub fn to_device(&mut self, device: &Device) -> Result<()> {
@@ -530,7 +536,35 @@ pub trait Tokenizer {
         let input_ids = Tensor::new(input_ids, &Device::Cpu)?;
         let token_type_ids = Tensor::new(token_type_ids, &Device::Cpu)?;
 
-        Ok(BatchEncoding::new(input_ids, token_type_ids))
+        Ok(BatchEncoding::new(input_ids, token_type_ids, encodings))
+    }
+
+    fn encode_sequence_pairs(
+        &mut self,
+        sequence_pairs: Vec<(String, String)>,
+        padding: Option<Padding>,
+    ) -> Result<BatchEncoding> {
+        let tokenizer = match padding {
+            Some(padding) => self.get_tokenizer_with_padding(padding)?,
+            None => self.get_tokenizer(),
+        };
+
+        let encodings = tokenizer
+            .encode_batch(sequence_pairs, true)
+            .map_err(Error::msg)?;
+
+        let mut input_ids: Vec<Vec<u32>> = Vec::new();
+        let mut token_type_ids: Vec<Vec<u32>> = Vec::new();
+
+        for encoding in &encodings {
+            input_ids.push(encoding.get_ids().to_vec());
+            token_type_ids.push(encoding.get_type_ids().to_vec());
+        }
+
+        let input_ids = Tensor::new(input_ids, &Device::Cpu)?;
+        let token_type_ids = Tensor::new(token_type_ids, &Device::Cpu)?;
+
+        Ok(BatchEncoding::new(input_ids, token_type_ids, encodings))
     }
 }
 

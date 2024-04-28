@@ -5,8 +5,9 @@ use candle_core::{Device, IndexOp, Tensor, D};
 use tokenizers::{EncodeInput, Encoding};
 
 use crate::{
-    model::PreTrainedModel, tokenizer::Tokenizer, AutoModelForTokenClassification, AutoTokenizer,
-    FromPretrainedParameters,
+    model::PreTrainedModel,
+    tokenizer::{BatchEncoding, Tokenizer},
+    AutoModelForTokenClassification, AutoTokenizer, FromPretrainedParameters, Padding,
 };
 
 use super::utils::get_encodings;
@@ -138,11 +139,10 @@ impl TokenClassificationPipeline {
         })
     }
 
-    fn preprocess<'s, E>(&self, inputs: Vec<E>) -> Result<(Tensor, Tensor, Vec<Encoding>)>
-    where
-        E: Into<EncodeInput<'s>> + Send,
-    {
-        get_encodings(inputs, &self.tokenizer, &self.device)
+    fn preprocess(&mut self, inputs: Vec<String>) -> Result<BatchEncoding> {
+        let mut encodings = self.tokenizer.encode(inputs, Some(Padding::Longest))?;
+        encodings.to_device(&self.device)?;
+        Ok(encodings)
     }
 
     // TODO: improve this function lol
@@ -151,7 +151,7 @@ impl TokenClassificationPipeline {
         sentences: Vec<String>,
         batch_scores: Vec<Vec<Vec<f32>>>,
         batch_input_ids: Vec<Vec<u32>>,
-        encodings: Vec<Encoding>,
+        encodings: &Vec<Encoding>,
     ) -> Result<Vec<Vec<PreEntity>>> {
         let mut pre_entities: Vec<Vec<PreEntity>> = Vec::new();
         for (((sentence, scores), input_ids), encoding) in sentences
@@ -443,7 +443,7 @@ impl TokenClassificationPipeline {
         sentences: Vec<String>,
         batch_input_ids: Vec<Vec<u32>>,
         model_outputs: &Tensor,
-        encodings: Vec<Encoding>,
+        encodings: &Vec<Encoding>,
         ignore_labels: Vec<String>,
         aggregation_strategy: AggregationStrategy,
     ) -> Result<Vec<Vec<Entity>>> {
@@ -460,21 +460,24 @@ impl TokenClassificationPipeline {
         Ok(entities)
     }
 
-    pub fn run<I: AsRef<str>>(
-        &self,
+    pub fn run<I: Into<String>>(
+        &mut self,
         input: I,
         options: Option<TokenClassificationOptions>,
     ) -> Result<Vec<Entity>> {
         let options = options.unwrap_or_default();
-        let sentences = vec![input.as_ref().to_string()];
-        let (input_ids, token_type_ids, encodings) = self.preprocess(vec![input.as_ref()])?;
-        let output = self.model.forward(&input_ids, &token_type_ids)?;
+        let inputs = vec![input.into()];
+        let encodings = self.preprocess(inputs.clone())?;
+        let input_ids = encodings.get_input_ids();
+        let output = self
+            .model
+            .forward(input_ids, encodings.get_token_type_ids())?;
         let entities = self
             .postprocess(
-                sentences,
+                inputs,
                 input_ids.to_vec2::<u32>()?,
                 &output,
-                encodings,
+                encodings.get_encodings(),
                 options.ignore_labels,
                 options.aggregation_strategy,
             )?
@@ -484,26 +487,23 @@ impl TokenClassificationPipeline {
         Ok(entities)
     }
 
-    pub fn run_batch<I: AsRef<str>>(
-        &self,
+    pub fn run_batch<I: Into<String>>(
+        &mut self,
         inputs: Vec<I>,
         options: Option<TokenClassificationOptions>,
     ) -> Result<Vec<Vec<Entity>>> {
         let options = options.unwrap_or_default();
-        let mut sentences: Vec<String> = Vec::new();
-        let mut encoded_inputs: Vec<EncodeInput> = Vec::new();
-        for input in inputs {
-            let input_str = input.as_ref().to_string();
-            sentences.push(input_str.clone());
-            encoded_inputs.push(input_str.into());
-        }
-        let (input_ids, token_type_ids, encodings) = self.preprocess(encoded_inputs)?;
-        let output = self.model.forward(&input_ids, &token_type_ids)?;
+        let inputs: Vec<String> = inputs.into_iter().map(|x| x.into()).collect();
+        let encodings = self.preprocess(inputs.clone())?;
+        let input_ids = encodings.get_input_ids();
+        let output = self
+            .model
+            .forward(input_ids, encodings.get_token_type_ids())?;
         self.postprocess(
-            sentences,
+            inputs,
             input_ids.to_vec2::<u32>()?,
             &output,
-            encodings,
+            encodings.get_encodings(),
             options.ignore_labels,
             options.aggregation_strategy,
         )

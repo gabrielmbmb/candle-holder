@@ -1,6 +1,5 @@
-use crate::impl_tokenizer;
-use crate::tokenizer::{Tokenizer, TokenizerBuilder, TokenizerConfig, TokenizerInfo};
 use anyhow::{Error, Result};
+use candle_core::{Device, Tensor};
 use tokenizers::models::bpe::Vocab;
 use tokenizers::models::wordpiece::WordPiece;
 use tokenizers::normalizers::BertNormalizer;
@@ -8,6 +7,11 @@ use tokenizers::{
     decoders::wordpiece::WordPiece as WordPieceDecoder, pre_tokenizers::bert::BertPreTokenizer,
     processors::template::TemplateProcessing, PaddingDirection, Tokenizer as CoreTokenizer,
     TokenizerImpl,
+};
+
+use crate::impl_tokenizer;
+use crate::tokenizer::{
+    BatchEncoding, Padding, Tokenizer, TokenizerBuilder, TokenizerConfig, TokenizerInfo,
 };
 
 const BERT_MAX_LENGTH: usize = 512;

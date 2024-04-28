@@ -1,4 +1,5 @@
 use anyhow::{Error, Result};
+use candle_core::{Device, Tensor};
 use tokenizers::{
     models::bpe::{Merges, Vocab, BPE},
     processors::{byte_level::ByteLevel, roberta::RobertaProcessing},
@@ -7,7 +8,7 @@ use tokenizers::{
 
 use crate::{
     impl_tokenizer,
-    tokenizer::{Tokenizer, TokenizerBuilder, TokenizerInfo},
+    tokenizer::{BatchEncoding, Padding, Tokenizer, TokenizerBuilder, TokenizerInfo},
 };
 
 const ROBERTA_MAX_LENGTH: usize = 512;

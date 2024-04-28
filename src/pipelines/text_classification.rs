@@ -1,14 +1,14 @@
 use anyhow::{Error, Result};
 use candle_core::{Device, Tensor, D};
 use candle_nn::ops::{sigmoid, softmax};
-use tokenizers::EncodeInput;
 
 use crate::{
-    config::ProblemType, model::PreTrainedModel, tokenizer::Tokenizer,
-    utils::FromPretrainedParameters, AutoModelForSequenceClassification, AutoTokenizer,
+    config::ProblemType,
+    model::PreTrainedModel,
+    tokenizer::{BatchEncoding, Tokenizer},
+    utils::FromPretrainedParameters,
+    AutoModelForSequenceClassification, AutoTokenizer, Padding,
 };
-
-use super::utils::get_encodings;
 
 pub struct TextClassificationPipeline {
     model: Box<dyn PreTrainedModel>,
@@ -35,12 +35,10 @@ impl TextClassificationPipeline {
         })
     }
 
-    fn preprocess<'s, E>(&self, inputs: Vec<E>) -> Result<(Tensor, Tensor)>
-    where
-        E: Into<EncodeInput<'s>> + Send,
-    {
-        let (input_ids, token_type_ids, _) = get_encodings(inputs, &self.tokenizer, &self.device)?;
-        Ok((input_ids, token_type_ids))
+    fn preprocess(&mut self, inputs: Vec<String>) -> Result<BatchEncoding> {
+        let mut encodings = self.tokenizer.encode(inputs, Some(Padding::Longest))?;
+        encodings.to_device(&self.device)?;
+        Ok(encodings)
     }
 
     fn postprocess(
@@ -69,9 +67,7 @@ impl TextClassificationPipeline {
             }
         }
         .to_vec2::<f32>()?;
-
         let mut results = Vec::new();
-
         for inner in &scores {
             let mut scores_with_labels = inner
                 .iter()
@@ -83,30 +79,33 @@ impl TextClassificationPipeline {
                 .collect::<Vec<(String, f32)>>();
             scores_with_labels.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
             if let Some(top_k) = top_k {
-                scores_with_labels.truncate(top_k as usize);
+                scores_with_labels.truncate(top_k);
             }
             results.push(scores_with_labels);
         }
-
         Ok(results)
     }
-
-    pub fn run<I: AsRef<str>>(&self, input: I, top_k: Option<usize>) -> Result<Vec<(String, f32)>> {
-        let (input_ids, token_type_ids) = self.preprocess(vec![input.as_ref()])?;
-        let output = self.model.forward(&input_ids, &token_type_ids)?;
+    pub fn run<I: Into<String>>(
+        &mut self,
+        input: I,
+        top_k: Option<usize>,
+    ) -> Result<Vec<(String, f32)>> {
+        let encodings = self.preprocess(vec![input.into()])?;
+        let output = self
+            .model
+            .forward(encodings.get_input_ids(), encodings.get_token_type_ids())?;
         Ok(self.postprocess(output, top_k)?[0].clone())
     }
-
-    pub fn run_batch<'s, E>(
-        &self,
-        inputs: Vec<E>,
+    pub fn run_batch<I: Into<String>>(
+        &mut self,
+        inputs: Vec<I>,
         top_k: Option<usize>,
-    ) -> Result<Vec<Vec<(String, f32)>>>
-    where
-        E: Into<EncodeInput<'s>> + Send,
-    {
-        let (input_ids, token_type_ids) = self.preprocess(inputs)?;
-        let output = self.model.forward(&input_ids, &token_type_ids)?;
+    ) -> Result<Vec<Vec<(String, f32)>>> {
+        let inputs: Vec<String> = inputs.into_iter().map(|x| x.into()).collect();
+        let encodings = self.preprocess(inputs)?;
+        let output = self
+            .model
+            .forward(encodings.get_input_ids(), encodings.get_token_type_ids())?;
         self.postprocess(output, top_k)
     }
 }

@@ -3,18 +3,13 @@ use candle_core::{Device, Tensor};
 use candle_nn::VarBuilder;
 
 use crate::config::PretrainedConfig;
-use crate::models::bert::{BertModel, BERT_DTYPE};
-use crate::BertForTokenClassification;
-
-use crate::{
-    utils::{from_pretrained, FromPretrainedParameters},
-    BertForSequenceClassification,
 use crate::models::bert::{
     BertForMaskedLM, BertForSequenceClassification, BertForTokenClassification, BertModel,
     BERT_DTYPE,
 };
 
 use crate::utils::{from_pretrained, FromPretrainedParameters};
+
 #[macro_export]
 macro_rules! impl_from_pretrained_method {
     ($model_struct:ident, $dtype:expr) => {
