@@ -6,14 +6,19 @@ pub mod tokenizer;
 pub mod utils;
 
 // Model factory structs
-pub use model::{AutoModel, AutoModelForSequenceClassification, AutoModelForTokenClassification};
-pub use tokenizer::AutoTokenizer;
+pub use model::{
+    AutoModel, AutoModelForMaskedLM, AutoModelForSequenceClassification,
+    AutoModelForTokenClassification,
+};
+pub use tokenizer::{AutoTokenizer, Padding};
 pub use utils::FromPretrainedParameters;
 
 // Models
 pub use models::bert::{
-    BertForSequenceClassification, BertForTokenClassification, BertModel, BertTokenizer,
+    BertForMaskedLM, BertForSequenceClassification, BertForTokenClassification, BertModel,
+    BertTokenizer,
 };
+pub use models::roberta::RobertaTokenizer;
 
 // Pipelines
 pub use pipelines::text_classification::TextClassificationPipeline;

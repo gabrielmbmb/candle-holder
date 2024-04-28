@@ -1,3 +1,4 @@
+use crate::impl_tokenizer;
 use crate::tokenizer::{Tokenizer, TokenizerBuilder, TokenizerConfig, TokenizerInfo};
 use anyhow::{Error, Result};
 use tokenizers::models::bpe::Vocab;
@@ -5,9 +6,11 @@ use tokenizers::models::wordpiece::WordPiece;
 use tokenizers::normalizers::BertNormalizer;
 use tokenizers::{
     decoders::wordpiece::WordPiece as WordPieceDecoder, pre_tokenizers::bert::BertPreTokenizer,
-    processors::template::TemplateProcessing, Tokenizer as CoreTokenizer, TokenizerImpl,
+    processors::template::TemplateProcessing, PaddingDirection, Tokenizer as CoreTokenizer,
+    TokenizerImpl,
 };
 
+const BERT_MAX_LENGTH: usize = 512;
 const BERT_CLS_TOKEN: &str = "[CLS]";
 const BERT_MASK_TOKEN: &str = "[MASK]";
 const BERT_PAD_TOKEN: &str = "[PAD]";
@@ -16,18 +19,17 @@ const BERT_UNK_TOKEN: &str = "[UNK]";
 
 pub struct BertTokenizer {
     tokenizer: CoreTokenizer,
+    max_length: usize,
+    bos_token: Option<String>,
     cls_token: String,
+    eos_token: Option<String>,
     mask_token: String,
     pad_token: String,
     sep_token: String,
     unk_token: String,
 }
 
-impl Tokenizer for BertTokenizer {
-    fn get_tokenizer(&self) -> &CoreTokenizer {
-        &self.tokenizer
-    }
-}
+impl_tokenizer!(BertTokenizer, PaddingDirection::Right);
 
 pub struct BertTokenizerBuilder {
     tokenizer_info: TokenizerInfo,
@@ -130,6 +132,12 @@ impl TokenizerBuilder<BertTokenizer> for BertTokenizerBuilder {
     }
 
     fn build_with_tokenizer(&self, tokenizer: CoreTokenizer) -> Result<BertTokenizer> {
+        let max_length = self
+            .tokenizer_info
+            .config
+            .as_ref()
+            .and_then(|config| config.model_max_length)
+            .unwrap_or(BERT_MAX_LENGTH);
         let cls_token = self
             .tokenizer_info
             .get_cls_token()
@@ -153,7 +161,10 @@ impl TokenizerBuilder<BertTokenizer> for BertTokenizerBuilder {
 
         Ok(BertTokenizer {
             tokenizer,
+            max_length,
+            bos_token: None,
             cls_token,
+            eos_token: None,
             mask_token,
             pad_token,
             sep_token,

@@ -2,11 +2,15 @@ use anyhow::{Error, Result};
 use tokenizers::{
     models::bpe::{Merges, Vocab, BPE},
     processors::{byte_level::ByteLevel, roberta::RobertaProcessing},
-    NormalizerWrapper, Tokenizer as CoreTokenizer, TokenizerImpl,
+    NormalizerWrapper, PaddingDirection, Tokenizer as CoreTokenizer, TokenizerImpl,
 };
 
-use crate::tokenizer::{Tokenizer, TokenizerBuilder, TokenizerInfo};
+use crate::{
+    impl_tokenizer,
+    tokenizer::{Tokenizer, TokenizerBuilder, TokenizerInfo},
+};
 
+const ROBERTA_MAX_LENGTH: usize = 512;
 const ROBERTA_BOS_TOKEN: &str = "<s>";
 const ROBERTA_CLS_TOKEN: &str = "<s>";
 const ROBERTA_EOS_TOKEN: &str = "</s>";
@@ -17,20 +21,17 @@ const ROBERTA_UNK_TOKEN: &str = "<unk>";
 
 pub struct RobertaTokenizer {
     tokenizer: CoreTokenizer,
-    bos_token: String,
+    max_length: usize,
+    bos_token: Option<String>,
     cls_token: String,
-    eos_token: String,
+    eos_token: Option<String>,
     mask_token: String,
     pad_token: String,
     sep_token: String,
     unk_token: String,
 }
 
-impl Tokenizer for RobertaTokenizer {
-    fn get_tokenizer(&self) -> &CoreTokenizer {
-        &self.tokenizer
-    }
-}
+impl_tokenizer!(RobertaTokenizer, PaddingDirection::Right);
 
 pub struct RobertaTokenizerBuilder {
     tokenizer_info: TokenizerInfo,
@@ -113,6 +114,12 @@ impl TokenizerBuilder<RobertaTokenizer> for RobertaTokenizerBuilder {
     }
 
     fn build_with_tokenizer(&self, tokenizer: CoreTokenizer) -> Result<RobertaTokenizer> {
+        let max_length = self
+            .tokenizer_info
+            .config
+            .as_ref()
+            .and_then(|config| config.model_max_length)
+            .unwrap_or(ROBERTA_MAX_LENGTH);
         let bos_token = self
             .tokenizer_info
             .get_bos_token()
@@ -144,9 +151,10 @@ impl TokenizerBuilder<RobertaTokenizer> for RobertaTokenizerBuilder {
 
         Ok(RobertaTokenizer {
             tokenizer,
-            bos_token,
+            max_length,
+            bos_token: Some(bos_token),
             cls_token,
-            eos_token,
+            eos_token: Some(eos_token),
             mask_token,
             pad_token,
             sep_token,

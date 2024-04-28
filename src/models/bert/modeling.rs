@@ -1,6 +1,6 @@
 use crate::{config::PretrainedConfig, model::PreTrainedModel};
-use anyhow::{Error, Result};
-use candle_core::{DType, IndexOp, Module, Tensor, D};
+use anyhow::Result;
+use candle_core::{DType, IndexOp, Module, Tensor};
 use candle_nn::{
     embedding, layer_norm, linear, ops::softmax, Dropout, Embedding, LayerNorm, Linear, VarBuilder,
 };

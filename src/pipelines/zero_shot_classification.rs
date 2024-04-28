@@ -2,7 +2,6 @@ use anyhow::{Error, Result};
 use candle_core::{Device, IndexOp, Tensor, D};
 use candle_nn::ops::softmax;
 use dyn_fmt::AsStrFormatExt;
-use tokenizers::EncodeInput;
 
 use crate::{
     model::PreTrainedModel, tokenizer::Tokenizer, AutoModelForSequenceClassification,

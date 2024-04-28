@@ -11,7 +11,7 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Deserializer, Serialize};
 use tokenizers::{
     models::bpe::{Merges, Vocab},
-    EncodeInput, Encoding, Tokenizer as CoreTokenizer,
+    Encoding, PaddingDirection, PaddingParams, PaddingStrategy, Tokenizer as CoreTokenizer,
 };
 
 pub trait TensorEncoding {
@@ -197,7 +197,7 @@ pub struct TokenizerConfig {
     pub do_basic_tokenize: Option<bool>,
     pub do_lower_case: Option<bool>,
     pub mask_token: Option<String>,
-    pub model_max_length: Option<u32>,
+    pub model_max_length: Option<usize>,
     pub never_split: Option<Vec<String>>,
     pub pad_token: Option<String>,
     pub sep_token: Option<String>,
@@ -390,11 +390,199 @@ impl TokenizerInfo {
     }
 }
 
+#[derive(Debug)]
+pub enum Padding {
+    Longest,
+    MaxLength,
+    Fixed(usize),
+}
+
+#[derive(Debug)]
+pub struct BatchEncoding {
+    input_ids: Tensor,
+    token_type_ids: Tensor,
+}
+
+impl BatchEncoding {
+    pub fn new(input_ids: Tensor, token_type_ids: Tensor) -> Self {
+        BatchEncoding {
+            input_ids,
+            token_type_ids,
+        }
+    }
+
+    pub fn get_input_ids(&self) -> &Tensor {
+        &self.input_ids
+    }
+
+    pub fn get_token_type_ids(&self) -> &Tensor {
+        &self.token_type_ids
+    }
+
+    pub fn to_device(&mut self, device: &Device) -> Result<()> {
+        self.input_ids = self.input_ids.to_device(device)?;
+        self.token_type_ids = self.token_type_ids.to_device(device)?;
+        Ok(())
+    }
+}
+
 pub trait Tokenizer {
     fn get_tokenizer(&self) -> &CoreTokenizer;
-    fn get_mask_token(&self) -> String {
-        unimplemented!("get_mask_token method not implemented")
+
+    fn get_tokenizer_mut(&mut self) -> &mut CoreTokenizer;
+
+    fn get_tokenizer_with_padding(&mut self, padding: Padding) -> Result<&CoreTokenizer> {
+        let pad_token = self
+            .get_pad_token()
+            .ok_or_else(|| {
+                Error::msg(
+                    "Cannot get tokenizer with padding config because it doesn't have a pad token.",
+                )
+            })?
+            .to_string();
+
+        let pad_id = self.get_pad_token_id().ok_or_else(|| {
+            Error::msg(
+                "Cannot get tokenizer with padding config because it doesn't have a pad token id.",
+            )
+        })?;
+
+        let direction = self.get_padding_side();
+
+        let strategy = match padding {
+            Padding::Longest => PaddingStrategy::BatchLongest,
+            Padding::MaxLength => PaddingStrategy::Fixed(self.get_max_length()),
+            Padding::Fixed(length) => PaddingStrategy::Fixed(length),
+        };
+
+        let tokenizer = self.get_tokenizer_mut();
+
+        tokenizer.with_padding(Some(PaddingParams {
+            strategy,
+            direction,
+            pad_to_multiple_of: None,
+            pad_id,
+            pad_type_id: 0,
+            pad_token,
+        }));
+
+        Ok(tokenizer)
     }
+
+    fn get_padding_side(&self) -> PaddingDirection;
+    fn get_max_length(&self) -> usize;
+    fn get_bos_token(&self) -> Option<&str>;
+    fn get_cls_token(&self) -> Option<&str>;
+    fn get_eos_token(&self) -> Option<&str>;
+    fn get_mask_token(&self) -> Option<&str>;
+    fn get_pad_token(&self) -> Option<&str>;
+    fn get_sep_token(&self) -> Option<&str>;
+    fn get_unk_token(&self) -> Option<&str>;
+
+    fn get_token_id(&self, token: &str) -> Option<u32> {
+        self.get_tokenizer().token_to_id(token)
+    }
+
+    fn get_bos_token_id(&self) -> Option<u32> {
+        self.get_token_id(self.get_bos_token()?)
+    }
+
+    fn get_cls_token_id(&self) -> Option<u32> {
+        self.get_token_id(self.get_cls_token()?)
+    }
+
+    fn get_eos_token_id(&self) -> Option<u32> {
+        self.get_token_id(self.get_eos_token()?)
+    }
+
+    fn get_mask_token_id(&self) -> Option<u32> {
+        self.get_token_id(self.get_mask_token()?)
+    }
+
+    fn get_pad_token_id(&self) -> Option<u32> {
+        self.get_token_id(self.get_pad_token()?)
+    }
+
+    fn get_sep_token_id(&self) -> Option<u32> {
+        self.get_token_id(self.get_sep_token()?)
+    }
+
+    fn get_unk_token_id(&self) -> Option<u32> {
+        self.get_token_id(self.get_unk_token()?)
+    }
+
+    fn encode(&mut self, inputs: Vec<String>, padding: Option<Padding>) -> Result<BatchEncoding> {
+        let tokenizer = match padding {
+            Some(padding) => self.get_tokenizer_with_padding(padding)?,
+            None => self.get_tokenizer(),
+        };
+
+        let encodings = tokenizer.encode_batch(inputs, true).map_err(Error::msg)?;
+
+        let mut input_ids: Vec<Vec<u32>> = Vec::new();
+        let mut token_type_ids: Vec<Vec<u32>> = Vec::new();
+
+        for encoding in &encodings {
+            input_ids.push(encoding.get_ids().to_vec());
+            token_type_ids.push(encoding.get_type_ids().to_vec());
+        }
+
+        let input_ids = Tensor::new(input_ids, &Device::Cpu)?;
+        let token_type_ids = Tensor::new(token_type_ids, &Device::Cpu)?;
+
+        Ok(BatchEncoding::new(input_ids, token_type_ids))
+    }
+}
+
+#[macro_export]
+macro_rules! impl_tokenizer {
+    ($tokenizer_type:ty, $padding_dir:expr) => {
+        impl Tokenizer for $tokenizer_type {
+            fn get_tokenizer(&self) -> &CoreTokenizer {
+                &self.tokenizer
+            }
+
+            fn get_tokenizer_mut(&mut self) -> &mut CoreTokenizer {
+                &mut self.tokenizer
+            }
+
+            fn get_padding_side(&self) -> PaddingDirection {
+                $padding_dir
+            }
+
+            fn get_max_length(&self) -> usize {
+                self.max_length
+            }
+
+            fn get_bos_token(&self) -> Option<&str> {
+                self.bos_token.as_deref()
+            }
+
+            fn get_cls_token(&self) -> Option<&str> {
+                Some(self.cls_token.as_str())
+            }
+
+            fn get_eos_token(&self) -> Option<&str> {
+                self.eos_token.as_deref()
+            }
+
+            fn get_mask_token(&self) -> Option<&str> {
+                Some(self.mask_token.as_str())
+            }
+
+            fn get_pad_token(&self) -> Option<&str> {
+                Some(self.pad_token.as_str())
+            }
+
+            fn get_sep_token(&self) -> Option<&str> {
+                Some(self.sep_token.as_str())
+            }
+
+            fn get_unk_token(&self) -> Option<&str> {
+                Some(self.unk_token.as_str())
+            }
+        }
+    };
 }
 
 pub trait TokenizerBuilder<T: Tokenizer> {
@@ -496,6 +684,7 @@ pub fn from_pretrained<I: AsRef<str>>(
 
 pub struct AutoTokenizer {}
 
+#[macro_export]
 macro_rules! impl_auto_tokenizer_from_pretrained_method {
     ($auto_tokenizer_struct:ident, $(($tokenizer_class:expr, $tokenizer_struct:ident, $tokenizer_builder_struct:ident)), *) => {
         impl $auto_tokenizer_struct {
@@ -524,6 +713,7 @@ impl_auto_tokenizer_from_pretrained_method!(
 );
 
 // Implement `from_pretrained` method for each tokenizer
+#[macro_export]
 macro_rules! impl_tokenizer_from_pretrained_method {
     ($tokenizer_struct:ident, $tokenizer_builder_struct:ident) => {
         impl $tokenizer_struct {
