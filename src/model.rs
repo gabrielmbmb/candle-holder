@@ -9,8 +9,13 @@ use crate::BertForTokenClassification;
 use crate::{
     utils::{from_pretrained, FromPretrainedParameters},
     BertForSequenceClassification,
+use crate::models::bert::{
+    BertForMaskedLM, BertForSequenceClassification, BertForTokenClassification, BertModel,
+    BERT_DTYPE,
 };
 
+use crate::utils::{from_pretrained, FromPretrainedParameters};
+#[macro_export]
 macro_rules! impl_from_pretrained_method {
     ($model_struct:ident, $dtype:expr) => {
         impl $model_struct {
@@ -28,6 +33,7 @@ macro_rules! impl_from_pretrained_method {
     };
 }
 
+#[macro_export]
 macro_rules! impl_auto_model_from_pretrained_method {
     ($auto_model_struct:ident, $(($model_type:expr, $model_struct:ident, $dtype:expr)), *) => {
         impl $auto_model_struct {
@@ -82,7 +88,15 @@ impl_auto_model_from_pretrained_method!(
     ("bert", BertForTokenClassification, BERT_DTYPE)
 );
 
+pub struct AutoModelForMaskedLM {}
+
+impl_auto_model_from_pretrained_method!(
+    AutoModelForMaskedLM,
+    ("bert", BertForMaskedLM, BERT_DTYPE)
+);
+
 // Implement `from_pretrained` method for each model
 impl_from_pretrained_method!(BertModel, BERT_DTYPE);
 impl_from_pretrained_method!(BertForSequenceClassification, BERT_DTYPE);
 impl_from_pretrained_method!(BertForTokenClassification, BERT_DTYPE);
+impl_from_pretrained_method!(BertForMaskedLM, BERT_DTYPE);
