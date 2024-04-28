@@ -7,10 +7,11 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.75"
-candle-core = "0.3.2"
-candle-nn = "0.3.2"
+candle-core = { version = "0.4.1", features = ["metal"] }
+candle-nn = "0.4.1"
+dyn-fmt = "0.4.0"
 hf-hub = "0.3.2"
 lazy_static = "1.4.0"
 serde = { version = "1.0.192", features = ["derive"] }
 serde_json = "1.0.108"
-tokenizers = { version = "0.15.0", features = ["http"] }
+tokenizers = { version = "0.19.1", features = ["http"] }
