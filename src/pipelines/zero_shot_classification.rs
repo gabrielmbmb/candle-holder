@@ -9,8 +9,6 @@ use crate::{
     AutoModelForSequenceClassification, AutoTokenizer, FromPretrainedParameters, Padding,
 };
 
-use super::utils::get_encodings;
-
 const DEFAULT_HYPOTHESIS_TEMPLATE: &str = "This example is {}.";
 
 pub struct ZeroShotClassificationOptions {
@@ -78,9 +76,9 @@ impl ZeroShotClassificationPipeline {
             candidate_labels,
             &options.hypothesis_template,
         )?;
-        let mut encodings = self
-            .tokenizer
-            .encode_sequence_pairs(sequence_pairs, Some(Padding::Longest))?;
+        let mut encodings =
+            self.tokenizer
+                .encode_sequence_pairs(sequence_pairs, true, Some(Padding::Longest))?;
         encodings.to_device(&self.device)?;
         Ok(encodings)
     }

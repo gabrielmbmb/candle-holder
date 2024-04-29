@@ -517,13 +517,20 @@ pub trait Tokenizer {
         self.get_token_id(self.get_unk_token()?)
     }
 
-    fn encode(&mut self, inputs: Vec<String>, padding: Option<Padding>) -> Result<BatchEncoding> {
+    fn encode(
+        &mut self,
+        inputs: Vec<String>,
+        add_special_tokens: bool,
+        padding: Option<Padding>,
+    ) -> Result<BatchEncoding> {
         let tokenizer = match padding {
             Some(padding) => self.get_tokenizer_with_padding(padding)?,
             None => self.get_tokenizer(),
         };
 
-        let encodings = tokenizer.encode_batch(inputs, true).map_err(Error::msg)?;
+        let encodings = tokenizer
+            .encode_batch(inputs, add_special_tokens)
+            .map_err(Error::msg)?;
 
         let mut input_ids: Vec<Vec<u32>> = Vec::new();
         let mut token_type_ids: Vec<Vec<u32>> = Vec::new();
@@ -542,6 +549,7 @@ pub trait Tokenizer {
     fn encode_sequence_pairs(
         &mut self,
         sequence_pairs: Vec<(String, String)>,
+        add_special_tokens: bool,
         padding: Option<Padding>,
     ) -> Result<BatchEncoding> {
         let tokenizer = match padding {
@@ -550,7 +558,7 @@ pub trait Tokenizer {
         };
 
         let encodings = tokenizer
-            .encode_batch(sequence_pairs, true)
+            .encode_batch(sequence_pairs, add_special_tokens)
             .map_err(Error::msg)?;
 
         let mut input_ids: Vec<Vec<u32>> = Vec::new();
@@ -565,6 +573,13 @@ pub trait Tokenizer {
         let token_type_ids = Tensor::new(token_type_ids, &Device::Cpu)?;
 
         Ok(BatchEncoding::new(input_ids, token_type_ids, encodings))
+    }
+
+    fn decode(&self, ids: &[u32], skip_special_tokens: bool) -> Result<String> {
+        let tokenizer = self.get_tokenizer();
+        tokenizer
+            .decode(ids, skip_special_tokens)
+            .map_err(Error::msg)
     }
 }
 

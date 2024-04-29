@@ -2,15 +2,13 @@ use std::collections::HashMap;
 
 use anyhow::{Error, Result};
 use candle_core::{Device, IndexOp, Tensor, D};
-use tokenizers::{EncodeInput, Encoding};
+use tokenizers::Encoding;
 
 use crate::{
     model::PreTrainedModel,
     tokenizer::{BatchEncoding, Tokenizer},
     AutoModelForTokenClassification, AutoTokenizer, FromPretrainedParameters, Padding,
 };
-
-use super::utils::get_encodings;
 
 #[derive(Debug, Clone)]
 #[non_exhaustive]
@@ -140,7 +138,9 @@ impl TokenClassificationPipeline {
     }
 
     fn preprocess(&mut self, inputs: Vec<String>) -> Result<BatchEncoding> {
-        let mut encodings = self.tokenizer.encode(inputs, Some(Padding::Longest))?;
+        let mut encodings = self
+            .tokenizer
+            .encode(inputs, true, Some(Padding::Longest))?;
         encodings.to_device(&self.device)?;
         Ok(encodings)
     }

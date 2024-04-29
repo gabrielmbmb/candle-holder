@@ -36,7 +36,7 @@ impl TextClassificationPipeline {
     }
 
     fn preprocess(&mut self, inputs: Vec<String>) -> Result<BatchEncoding> {
-        let mut encodings = self.tokenizer.encode(inputs, Some(Padding::Longest))?;
+        let mut encodings = self.tokenizer.encode(inputs, true, Some(Padding::Longest))?;
         encodings.to_device(&self.device)?;
         Ok(encodings)
     }
