@@ -41,7 +41,12 @@ pub struct BertTokenizerBuilder {
 
 impl BertTokenizerBuilder {
     fn build_normalizer(&self, config: &TokenizerConfig) -> BertNormalizer {
-        BertNormalizer::from(config)
+        BertNormalizer::new(
+            config.clean_up_tokenization_spaces.unwrap_or(true),
+            config.tokenize_chinese_charts.unwrap_or(true),
+            config.strip_accents,
+            config.do_lower_case.unwrap_or(true),
+        )
     }
 
     fn build_pre_tokenizer(&self) -> BertPreTokenizer {
@@ -52,6 +57,8 @@ impl BertTokenizerBuilder {
         WordPiece::builder()
             .vocab(vocab)
             .unk_token(unk_token)
+            .continuing_subword_prefix("##".to_string())
+            .max_input_chars_per_word(100)
             .build()
             .map_err(Error::msg)
     }
@@ -75,7 +82,7 @@ impl BertTokenizerBuilder {
     }
 
     fn build_decoder(&self) -> WordPieceDecoder {
-        WordPieceDecoder::default()
+        WordPieceDecoder::new("##".to_string(), true)
     }
 }
 
@@ -174,13 +181,5 @@ impl TokenizerBuilder<BertTokenizer> for BertTokenizerBuilder {
             sep_token,
             unk_token,
         })
-    }
-}
-
-impl From<&TokenizerConfig> for BertNormalizer {
-    fn from(config: &TokenizerConfig) -> Self {
-        let strip_accents = config.strip_accents;
-        let lowercase = config.do_lower_case.unwrap_or(false);
-        BertNormalizer::new(true, true, strip_accents, lowercase)
     }
 }

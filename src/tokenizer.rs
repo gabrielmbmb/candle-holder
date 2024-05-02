@@ -11,7 +11,8 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Deserializer, Serialize};
 use tokenizers::{
     models::bpe::{Merges, Vocab},
-    Encoding, PaddingDirection, PaddingParams, PaddingStrategy, Tokenizer as CoreTokenizer,
+    AddedToken, Encoding, PaddingDirection, PaddingParams, PaddingStrategy,
+    Tokenizer as CoreTokenizer,
 };
 
 pub trait TensorEncoding {
@@ -90,30 +91,27 @@ pub fn load_merges(file_path: std::path::PathBuf) -> Result<Merges> {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct SpecialToken {
-    content: String,
-    #[serde(default)]
-    lstrip: bool,
-    #[serde(default)]
-    normalized: bool,
-    #[serde(default)]
-    rstrip: bool,
-    #[serde(default)]
-    single_word: bool,
+struct AddedTokenWithDefaults {
+    added_token: AddedToken,
 }
 
-fn deserialize_special_token<'de, D>(deserializer: D) -> Result<Option<SpecialToken>, D::Error>
+fn deserialize_special_token<'de, D>(
+    deserializer: D,
+) -> Result<Option<AddedTokenWithDefaults>, D::Error>
 where
     D: Deserializer<'de>,
 {
     Deserialize::deserialize(deserializer).map(|v| {
         if let serde_json::Value::String(s) = v {
-            Some(SpecialToken {
-                content: s,
-                lstrip: false,
-                normalized: false,
-                rstrip: false,
-                single_word: false,
+            Some(AddedTokenWithDefaults {
+                added_token: AddedToken {
+                    content: s,
+                    single_word: false,
+                    lstrip: false,
+                    rstrip: false,
+                    normalized: false,
+                    special: true,
+                },
             })
         } else {
             serde_json::from_value(v).ok()
@@ -124,48 +122,62 @@ where
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SpecialTokensMap {
     #[serde(deserialize_with = "deserialize_special_token", default)]
-    cls_token: Option<SpecialToken>,
+    cls_token: Option<AddedTokenWithDefaults>,
     #[serde(deserialize_with = "deserialize_special_token", default)]
-    mask_token: Option<SpecialToken>,
+    mask_token: Option<AddedTokenWithDefaults>,
     #[serde(deserialize_with = "deserialize_special_token", default)]
-    pad_token: Option<SpecialToken>,
+    pad_token: Option<AddedTokenWithDefaults>,
     #[serde(deserialize_with = "deserialize_special_token", default)]
-    sep_token: Option<SpecialToken>,
+    sep_token: Option<AddedTokenWithDefaults>,
     #[serde(deserialize_with = "deserialize_special_token", default)]
-    bos_token: Option<SpecialToken>,
+    bos_token: Option<AddedTokenWithDefaults>,
     #[serde(deserialize_with = "deserialize_special_token", default)]
-    eos_token: Option<SpecialToken>,
+    eos_token: Option<AddedTokenWithDefaults>,
     #[serde(deserialize_with = "deserialize_special_token", default)]
-    unk_token: Option<SpecialToken>,
+    unk_token: Option<AddedTokenWithDefaults>,
 }
 
 impl SpecialTokensMap {
     pub fn get_cls_token(&self) -> Option<String> {
-        self.cls_token.as_ref().map(|t| t.content.clone())
+        self.cls_token
+            .as_ref()
+            .map(|t| t.added_token.content.clone())
     }
 
     pub fn get_mask_token(&self) -> Option<String> {
-        self.mask_token.as_ref().map(|t| t.content.clone())
+        self.mask_token
+            .as_ref()
+            .map(|t| t.added_token.content.clone())
     }
 
     pub fn get_pad_token(&self) -> Option<String> {
-        self.pad_token.as_ref().map(|t| t.content.clone())
+        self.pad_token
+            .as_ref()
+            .map(|t| t.added_token.content.clone())
     }
 
     pub fn get_sep_token(&self) -> Option<String> {
-        self.sep_token.as_ref().map(|t| t.content.clone())
+        self.sep_token
+            .as_ref()
+            .map(|t| t.added_token.content.clone())
     }
 
     pub fn get_bos_token(&self) -> Option<String> {
-        self.bos_token.as_ref().map(|t| t.content.clone())
+        self.bos_token
+            .as_ref()
+            .map(|t| t.added_token.content.clone())
     }
 
     pub fn get_eos_token(&self) -> Option<String> {
-        self.eos_token.as_ref().map(|t| t.content.clone())
+        self.eos_token
+            .as_ref()
+            .map(|t| t.added_token.content.clone())
     }
 
     pub fn get_unk_token(&self) -> Option<String> {
-        self.unk_token.as_ref().map(|t| t.content.clone())
+        self.unk_token
+            .as_ref()
+            .map(|t| t.added_token.content.clone())
     }
 }
 
@@ -176,19 +188,9 @@ pub fn load_special_tokens_map(file_path: std::path::PathBuf) -> Result<SpecialT
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct AddedToken {
-    content: String,
-    lstrip: bool,
-    normalized: bool,
-    rstrip: bool,
-    single_word: bool,
-    special: bool,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
 pub struct TokenizerConfig {
     pub add_prefix_space: Option<bool>,
-    pub added_tokens_decoder: Option<HashMap<String, AddedToken>>,
+    pub added_tokens_decoder: Option<HashMap<u32, AddedToken>>,
     pub bos_token: Option<String>,
     pub clean_up_tokenization_spaces: Option<bool>,
     pub cls_token: Option<String>,
@@ -271,37 +273,37 @@ impl TokenizerInfo {
             match special_token_name {
                 SpecialTokenName::Cls => {
                     if let Some(cls_token) = &special_tokens_map.cls_token {
-                        return Some(cls_token.content.clone());
+                        return Some(cls_token.added_token.content.clone());
                     }
                 }
                 SpecialTokenName::Mask => {
                     if let Some(mask_token) = &special_tokens_map.mask_token {
-                        return Some(mask_token.content.clone());
+                        return Some(mask_token.added_token.content.clone());
                     }
                 }
                 SpecialTokenName::Pad => {
                     if let Some(pad_token) = &special_tokens_map.pad_token {
-                        return Some(pad_token.content.clone());
+                        return Some(pad_token.added_token.content.clone());
                     }
                 }
                 SpecialTokenName::Sep => {
                     if let Some(sep_token) = &special_tokens_map.sep_token {
-                        return Some(sep_token.content.clone());
+                        return Some(sep_token.added_token.content.clone());
                     }
                 }
                 SpecialTokenName::Bos => {
                     if let Some(bos_token) = &special_tokens_map.bos_token {
-                        return Some(bos_token.content.clone());
+                        return Some(bos_token.added_token.content.clone());
                     }
                 }
                 SpecialTokenName::Eos => {
                     if let Some(eos_token) = &special_tokens_map.eos_token {
-                        return Some(eos_token.content.clone());
+                        return Some(eos_token.added_token.content.clone());
                     }
                 }
                 SpecialTokenName::Unk => {
                     if let Some(unk_token) = &special_tokens_map.unk_token {
-                        return Some(unk_token.content.clone());
+                        return Some(unk_token.added_token.content.clone());
                     }
                 }
             }
@@ -649,14 +651,57 @@ pub trait TokenizerBuilder<T: Tokenizer> {
     fn build(&mut self) -> Result<T> {
         let tokenizer_info = self.get_tokenizer_info();
 
-        // Try first to build from `tokenizer.json`
-        if let Some(tokenizer_file_path) = &tokenizer_info.tokenizer_file_path {
-            let tokenizer = CoreTokenizer::from_file(tokenizer_file_path).map_err(Error::msg)?;
-            return self.build_with_tokenizer(tokenizer);
+        let mut special_tokens: Vec<AddedToken> = Vec::new();
+        if let Some(ref special_tokens_map) = tokenizer_info.special_tokens_map {
+            if let Some(cls_token) = &special_tokens_map.cls_token {
+                special_tokens.push(cls_token.added_token.clone());
+            }
+
+            if let Some(mask_token) = &special_tokens_map.mask_token {
+                special_tokens.push(mask_token.added_token.clone());
+            }
+
+            if let Some(pad_token) = &special_tokens_map.pad_token {
+                special_tokens.push(pad_token.added_token.clone());
+            }
+
+            if let Some(sep_token) = &special_tokens_map.sep_token {
+                special_tokens.push(sep_token.added_token.clone());
+            }
+
+            if let Some(bos_token) = &special_tokens_map.bos_token {
+                special_tokens.push(bos_token.added_token.clone());
+            }
+
+            if let Some(eos_token) = &special_tokens_map.eos_token {
+                special_tokens.push(eos_token.added_token.clone());
+            }
+
+            if let Some(unk_token) = &special_tokens_map.unk_token {
+                special_tokens.push(unk_token.added_token.clone());
+            }
         }
 
-        // Try to build from `vocab.txt`, `vocab.json` and `merges.txt`
-        let tokenizer = self.build_tokenizer()?;
+        let mut added_tokens: Vec<AddedToken> = Vec::new();
+        if let Some(config) = &tokenizer_info.config {
+            if let Some(added_tokens_decoder) = &config.added_tokens_decoder {
+                for added_token in added_tokens_decoder.values() {
+                    added_tokens.push(added_token.clone());
+                }
+            }
+        }
+
+        // Try to build from `tokenizer.json`. Otherwise, build from `vocab.txt`, `vocab.json` and `merges.txt`
+        let mut tokenizer = match &tokenizer_info.tokenizer_file_path {
+            Some(tokenizer_file_path) => {
+                CoreTokenizer::from_file(tokenizer_file_path).map_err(Error::msg)?
+            }
+            _ => self.build_tokenizer()?,
+        };
+
+        tokenizer.add_special_tokens(&special_tokens);
+        tokenizer.add_tokens(&added_tokens);
+
         self.build_with_tokenizer(tokenizer)
     }
 }
