@@ -61,7 +61,7 @@ pub trait PreTrainedModel {
     fn load(vb: VarBuilder, config: serde_json::Value) -> Result<Self>
     where
         Self: Sized;
-    fn config(&self) -> PretrainedConfig;
+    fn config(&self) -> &PretrainedConfig;
     fn forward(&self, input_ids: &Tensor, token_type_ids: &Tensor) -> Result<Tensor>;
 }
 

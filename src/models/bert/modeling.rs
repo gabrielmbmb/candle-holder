@@ -551,8 +551,8 @@ impl PreTrainedModel for BertModel {
         Ok(sequence_output)
     }
 
-    fn config(&self) -> PretrainedConfig {
-        self.config.pretrained_config.clone()
+    fn config(&self) -> &PretrainedConfig {
+        &self.config.pretrained_config
     }
 }
 
@@ -589,8 +589,8 @@ impl PreTrainedModel for BertForSequenceClassification {
         Ok(logits)
     }
 
-    fn config(&self) -> PretrainedConfig {
-        self.config.pretrained_config.clone()
+    fn config(&self) -> &PretrainedConfig {
+        &self.config.pretrained_config
     }
 }
 
@@ -629,8 +629,8 @@ impl PreTrainedModel for BertForTokenClassification {
         Ok(logits)
     }
 
-    fn config(&self) -> PretrainedConfig {
-        self.config.pretrained_config.clone()
+    fn config(&self) -> &PretrainedConfig {
+        &self.config.pretrained_config
     }
 }
 
@@ -658,7 +658,7 @@ impl PreTrainedModel for BertForMaskedLM {
         Ok(logits)
     }
 
-    fn config(&self) -> PretrainedConfig {
-        self.config.pretrained_config.clone()
+    fn config(&self) -> &PretrainedConfig {
+        &self.config.pretrained_config
     }
 }
