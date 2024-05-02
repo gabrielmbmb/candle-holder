@@ -82,6 +82,8 @@ impl FillMaskPipeline {
 
         let mut results = Vec::new();
         for (indexes, input_ids) in masked_index.into_iter().zip(input_ids) {
+            let single_mask = indexes.len() == 1;
+
             // Select the logits for the masked token
             let logits =
                 output.index_select(&Tensor::new(indexes.clone(), &self.device)?, D::Minus2)?;
@@ -95,7 +97,6 @@ impl FillMaskPipeline {
             for (_probs, index) in probs.into_iter().zip(indexes) {
                 // For each mask token in the sentence, get the top k predictions
                 let topk = topk(&_probs, top_k);
-                let single_mask = topk.len() == 1;
 
                 let mut mask_results = Vec::new();
                 for (score, token_id) in topk.into_iter() {
@@ -105,8 +106,8 @@ impl FillMaskPipeline {
 
                     // Replace the mask token with the predicted token
                     input_ids[index as usize] = token_id;
-                    let token = self.tokenizer.decode(&[token_id], single_mask)?;
-                    let sentence = self.tokenizer.decode(&input_ids, false)?;
+                    let token = self.tokenizer.decode(&[token_id], false)?;
+                    let sentence = self.tokenizer.decode(&input_ids, single_mask)?;
                     mask_results.push((score, token_id, token, sentence));
                 }
                 sentence_results.push(mask_results);
