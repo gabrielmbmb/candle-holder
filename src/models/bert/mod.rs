@@ -1,3 +1,4 @@
+pub mod config;
 pub mod modeling;
 pub mod tokenizer;
 
