@@ -8,6 +8,7 @@ use crate::models::bert::{
     BERT_DTYPE,
 };
 
+use crate::tokenizer::BatchEncoding;
 use crate::utils::{from_pretrained, FromPretrainedParameters};
 
 #[macro_export]
@@ -62,7 +63,7 @@ pub trait PreTrainedModel {
     where
         Self: Sized;
     fn config(&self) -> &PretrainedConfig;
-    fn forward(&self, input_ids: &Tensor, token_type_ids: &Tensor) -> Result<Tensor>;
+    fn forward(&self, encodings: &BatchEncoding) -> Result<Tensor>;
 }
 
 pub struct AutoModel {}

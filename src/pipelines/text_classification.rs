@@ -36,7 +36,9 @@ impl TextClassificationPipeline {
     }
 
     fn preprocess(&mut self, inputs: Vec<String>) -> Result<BatchEncoding> {
-        let mut encodings = self.tokenizer.encode(inputs, true, Some(Padding::Longest))?;
+        let mut encodings = self
+            .tokenizer
+            .encode(inputs, true, Some(Padding::Longest))?;
         encodings.to_device(&self.device)?;
         Ok(encodings)
     }
@@ -91,9 +93,7 @@ impl TextClassificationPipeline {
         top_k: Option<usize>,
     ) -> Result<Vec<(String, f32)>> {
         let encodings = self.preprocess(vec![input.into()])?;
-        let output = self
-            .model
-            .forward(encodings.get_input_ids(), encodings.get_token_type_ids())?;
+        let output = self.model.forward(&encodings)?;
         Ok(self.postprocess(output, top_k)?[0].clone())
     }
     pub fn run_batch<I: Into<String>>(
@@ -103,9 +103,7 @@ impl TextClassificationPipeline {
     ) -> Result<Vec<Vec<(String, f32)>>> {
         let inputs: Vec<String> = inputs.into_iter().map(|x| x.into()).collect();
         let encodings = self.preprocess(inputs)?;
-        let output = self
-            .model
-            .forward(encodings.get_input_ids(), encodings.get_token_type_ids())?;
+        let output = self.model.forward(&encodings)?;
         self.postprocess(output, top_k)
     }
 }

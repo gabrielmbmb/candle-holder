@@ -147,9 +147,7 @@ impl FillMaskPipeline {
     ) -> Result<Vec<Vec<FillMaskResult>>> {
         let options = options.unwrap_or_default();
         let (encodings, masked_index) = self.preprocess(vec![input.into()])?;
-        let output = self
-            .model
-            .forward(encodings.get_input_ids(), encodings.get_token_type_ids())?;
+        let output = self.model.forward(&encodings)?;
         Ok(self.postprocess(&output, encodings, masked_index, options.top_k)?[0].clone())
     }
 
@@ -161,9 +159,7 @@ impl FillMaskPipeline {
         let options = options.unwrap_or_default();
         let inputs: Vec<String> = inputs.into_iter().map(|x| x.into()).collect();
         let (encodings, masked_index) = self.preprocess(inputs)?;
-        let output = self
-            .model
-            .forward(encodings.get_input_ids(), encodings.get_token_type_ids())?;
+        let output = self.model.forward(&encodings)?;
         self.postprocess(&output, encodings, masked_index, options.top_k)
     }
 }
