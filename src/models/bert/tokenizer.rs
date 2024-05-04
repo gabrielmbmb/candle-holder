@@ -25,12 +25,12 @@ pub struct BertTokenizer {
     tokenizer: CoreTokenizer,
     max_length: usize,
     bos_token: Option<String>,
-    cls_token: String,
+    cls_token: Option<String>,
     eos_token: Option<String>,
-    mask_token: String,
-    pad_token: String,
-    sep_token: String,
-    unk_token: String,
+    mask_token: Option<String>,
+    pad_token: Option<String>,
+    sep_token: Option<String>,
+    unk_token: Option<String>,
 }
 
 impl_tokenizer!(BertTokenizer, PaddingDirection::Right);
@@ -174,12 +174,12 @@ impl TokenizerBuilder<BertTokenizer> for BertTokenizerBuilder {
             tokenizer,
             max_length,
             bos_token: None,
-            cls_token,
+            cls_token: Some(cls_token),
             eos_token: None,
-            mask_token,
-            pad_token,
-            sep_token,
-            unk_token,
+            mask_token: Some(mask_token),
+            pad_token: Some(pad_token),
+            sep_token: Some(sep_token),
+            unk_token: Some(unk_token),
         })
     }
 }

@@ -1,5 +1,4 @@
 use anyhow::{Error, Result};
-use candle_core::{Device, Tensor};
 use tokenizers::{
     models::bpe::{Merges, Vocab, BPE},
     processors::{byte_level::ByteLevel, roberta::RobertaProcessing},
@@ -8,7 +7,7 @@ use tokenizers::{
 
 use crate::{
     impl_tokenizer,
-    tokenizer::{BatchEncoding, Padding, Tokenizer, TokenizerBuilder, TokenizerInfo},
+    tokenizer::{Tokenizer, TokenizerBuilder, TokenizerInfo},
 };
 
 const ROBERTA_MAX_LENGTH: usize = 512;
@@ -24,12 +23,12 @@ pub struct RobertaTokenizer {
     tokenizer: CoreTokenizer,
     max_length: usize,
     bos_token: Option<String>,
-    cls_token: String,
+    cls_token: Option<String>,
     eos_token: Option<String>,
-    mask_token: String,
-    pad_token: String,
-    sep_token: String,
-    unk_token: String,
+    mask_token: Option<String>,
+    pad_token: Option<String>,
+    sep_token: Option<String>,
+    unk_token: Option<String>,
 }
 
 impl_tokenizer!(RobertaTokenizer, PaddingDirection::Right);
@@ -154,12 +153,12 @@ impl TokenizerBuilder<RobertaTokenizer> for RobertaTokenizerBuilder {
             tokenizer,
             max_length,
             bos_token: Some(bos_token),
-            cls_token,
+            cls_token: Some(cls_token),
             eos_token: Some(eos_token),
-            mask_token,
-            pad_token,
-            sep_token,
-            unk_token,
+            mask_token: Some(mask_token),
+            pad_token: Some(pad_token),
+            sep_token: Some(sep_token),
+            unk_token: Some(unk_token),
         })
     }
 }

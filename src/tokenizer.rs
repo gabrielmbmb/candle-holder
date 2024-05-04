@@ -1,11 +1,14 @@
 use std::{collections::HashMap, fs};
 
 use crate::{
-    models::bert::{BertTokenizer, BertTokenizerBuilder},
+    models::{
+        bert::{BertTokenizer, BertTokenizerBuilder},
+        llama::tokenizer::{LlamaTokenizer, LlamaTokenizerBuilder},
+    },
     FromPretrainedParameters,
 };
 use anyhow::{bail, Error, Result};
-use candle_core::{Device, Tensor};
+use candle_core::{DType, Device, Tensor};
 use hf_hub::{api::sync::Api, Repo, RepoType};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -403,14 +406,21 @@ pub enum Padding {
 pub struct BatchEncoding {
     input_ids: Tensor,
     token_type_ids: Tensor,
+    attention_mask: Tensor,
     encodings: Vec<Encoding>,
 }
 
 impl BatchEncoding {
-    pub fn new(input_ids: Tensor, token_type_ids: Tensor, encodings: Vec<Encoding>) -> Self {
+    pub fn new(
+        input_ids: Tensor,
+        token_type_ids: Tensor,
+        attention_mask: Tensor,
+        encodings: Vec<Encoding>,
+    ) -> Self {
         BatchEncoding {
             input_ids,
             token_type_ids,
+            attention_mask,
             encodings,
         }
     }
@@ -423,6 +433,10 @@ impl BatchEncoding {
         &self.token_type_ids
     }
 
+    pub fn get_attention_mask(&self) -> &Tensor {
+        &self.attention_mask
+    }
+
     pub fn get_encodings(&self) -> &Vec<Encoding> {
         &self.encodings
     }
@@ -430,6 +444,7 @@ impl BatchEncoding {
     pub fn to_device(&mut self, device: &Device) -> Result<()> {
         self.input_ids = self.input_ids.to_device(device)?;
         self.token_type_ids = self.token_type_ids.to_device(device)?;
+        self.attention_mask = self.attention_mask.to_device(device)?;
         Ok(())
     }
 }
@@ -536,16 +551,24 @@ pub trait Tokenizer {
 
         let mut input_ids: Vec<Vec<u32>> = Vec::new();
         let mut token_type_ids: Vec<Vec<u32>> = Vec::new();
+        let mut attention_mask: Vec<Vec<u32>> = Vec::new();
 
         for encoding in &encodings {
             input_ids.push(encoding.get_ids().to_vec());
             token_type_ids.push(encoding.get_type_ids().to_vec());
+            attention_mask.push(encoding.get_attention_mask().to_vec());
         }
 
         let input_ids = Tensor::new(input_ids, &Device::Cpu)?;
         let token_type_ids = Tensor::new(token_type_ids, &Device::Cpu)?;
+        let attention_mask = Tensor::new(attention_mask, &Device::Cpu)?.to_dtype(DType::U8)?;
 
-        Ok(BatchEncoding::new(input_ids, token_type_ids, encodings))
+        Ok(BatchEncoding::new(
+            input_ids,
+            token_type_ids,
+            attention_mask,
+            encodings,
+        ))
     }
 
     fn encode_sequence_pairs(
@@ -565,16 +588,24 @@ pub trait Tokenizer {
 
         let mut input_ids: Vec<Vec<u32>> = Vec::new();
         let mut token_type_ids: Vec<Vec<u32>> = Vec::new();
+        let mut attention_mask: Vec<Vec<u32>> = Vec::new();
 
         for encoding in &encodings {
             input_ids.push(encoding.get_ids().to_vec());
             token_type_ids.push(encoding.get_type_ids().to_vec());
+            attention_mask.push(encoding.get_attention_mask().to_vec());
         }
 
         let input_ids = Tensor::new(input_ids, &Device::Cpu)?;
         let token_type_ids = Tensor::new(token_type_ids, &Device::Cpu)?;
+        let attention_mask = Tensor::new(attention_mask, &Device::Cpu)?.to_dtype(DType::U8)?;
 
-        Ok(BatchEncoding::new(input_ids, token_type_ids, encodings))
+        Ok(BatchEncoding::new(
+            input_ids,
+            token_type_ids,
+            attention_mask,
+            encodings,
+        ))
     }
 
     fn decode(&self, ids: &[u32], skip_special_tokens: bool) -> Result<String> {
@@ -610,7 +641,7 @@ macro_rules! impl_tokenizer {
             }
 
             fn get_cls_token(&self) -> Option<&str> {
-                Some(self.cls_token.as_str())
+                self.cls_token.as_deref()
             }
 
             fn get_eos_token(&self) -> Option<&str> {
@@ -618,19 +649,19 @@ macro_rules! impl_tokenizer {
             }
 
             fn get_mask_token(&self) -> Option<&str> {
-                Some(self.mask_token.as_str())
+                self.mask_token.as_deref()
             }
 
             fn get_pad_token(&self) -> Option<&str> {
-                Some(self.pad_token.as_str())
+                self.pad_token.as_deref()
             }
 
             fn get_sep_token(&self) -> Option<&str> {
-                Some(self.sep_token.as_str())
+                self.sep_token.as_deref()
             }
 
             fn get_unk_token(&self) -> Option<&str> {
-                Some(self.unk_token.as_str())
+                self.unk_token.as_deref()
             }
         }
     };
@@ -788,14 +819,18 @@ macro_rules! impl_auto_tokenizer_from_pretrained_method {
             ) -> Result<Box<dyn Tokenizer>> {
                 let tokenizer_info = from_pretrained(repo_id, params)?;
 
-                let tokenizer = match tokenizer_info.get_tokenizer_class() {
+                let tokenizer: Result<Box<dyn Tokenizer>> = match tokenizer_info.get_tokenizer_class() {
                     $(
-                        $tokenizer_class => $tokenizer_builder_struct::new(tokenizer_info).build()?,
+                        $tokenizer_class => {
+                            $tokenizer_builder_struct::new(tokenizer_info)
+                                .build()
+                                .map(|tokenizer| Box::new(tokenizer) as Box<dyn Tokenizer>)
+                        }
                     )*
                     _ => bail!(format!("Could not determine tokenizer class")),
                 };
 
-                Ok(Box::new(tokenizer))
+                tokenizer
             }
         }
     };
@@ -803,7 +838,8 @@ macro_rules! impl_auto_tokenizer_from_pretrained_method {
 
 impl_auto_tokenizer_from_pretrained_method!(
     AutoTokenizer,
-    ("BertTokenizer", BertTokenizer, BertTokenizerBuilder)
+    ("BertTokenizer", BertTokenizer, BertTokenizerBuilder),
+    ("LlamaTokenizer", LlamaTokenizer, LlamaTokenizerBuilder)
 );
 
 // Implement `from_pretrained` method for each tokenizer
@@ -824,3 +860,4 @@ macro_rules! impl_tokenizer_from_pretrained_method {
 }
 
 impl_tokenizer_from_pretrained_method!(BertTokenizer, BertTokenizerBuilder);
+impl_tokenizer_from_pretrained_method!(LlamaTokenizer, LlamaTokenizerBuilder);
