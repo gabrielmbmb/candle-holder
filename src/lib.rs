@@ -1,5 +1,6 @@
 pub mod config;
 pub mod model;
+pub mod model_utils;
 pub mod models;
 pub mod pipelines;
 pub mod tokenizer;
@@ -18,6 +19,7 @@ pub use models::bert::{
     BertForMaskedLM, BertForSequenceClassification, BertForTokenClassification, BertModel,
     BertTokenizer,
 };
+pub use models::llama::{LlamaModel, LlamaTokenizer};
 pub use models::roberta::RobertaTokenizer;
 
 // Pipelines

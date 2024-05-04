@@ -8,6 +8,7 @@ use crate::models::bert::{
     BERT_DTYPE,
 };
 
+use crate::models::llama::modeling::{LlamaModel, LLAMA_DTYPE};
 use crate::tokenizer::BatchEncoding;
 use crate::utils::{from_pretrained, FromPretrainedParameters};
 
@@ -68,7 +69,11 @@ pub trait PreTrainedModel {
 
 pub struct AutoModel {}
 
-impl_auto_model_from_pretrained_method!(AutoModel, ("bert", BertModel, BERT_DTYPE));
+impl_auto_model_from_pretrained_method!(
+    AutoModel,
+    ("bert", BertModel, BERT_DTYPE),
+    ("llama", LlamaModel, LLAMA_DTYPE)
+);
 
 pub struct AutoModelForSequenceClassification {}
 
@@ -96,3 +101,4 @@ impl_from_pretrained_method!(BertModel, BERT_DTYPE);
 impl_from_pretrained_method!(BertForSequenceClassification, BERT_DTYPE);
 impl_from_pretrained_method!(BertForTokenClassification, BERT_DTYPE);
 impl_from_pretrained_method!(BertForMaskedLM, BERT_DTYPE);
+impl_from_pretrained_method!(LlamaModel, LLAMA_DTYPE);
