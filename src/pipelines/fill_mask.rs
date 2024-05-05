@@ -1,5 +1,5 @@
 use anyhow::{Error, Result};
-use candle_core::{error::zip, Device, Tensor, D};
+use candle_core::{Device, Tensor, D};
 use candle_nn::ops::softmax;
 
 use crate::{

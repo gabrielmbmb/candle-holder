@@ -1,5 +1,4 @@
 use anyhow::{Error, Result};
-use candle_core::{Device, Tensor};
 use tokenizers::models::bpe::Vocab;
 use tokenizers::models::wordpiece::WordPiece;
 use tokenizers::normalizers::BertNormalizer;
@@ -10,9 +9,7 @@ use tokenizers::{
 };
 
 use crate::impl_tokenizer;
-use crate::tokenizer::{
-    BatchEncoding, Padding, Tokenizer, TokenizerBuilder, TokenizerConfig, TokenizerInfo,
-};
+use crate::tokenizer::{Tokenizer, TokenizerBuilder, TokenizerConfig, TokenizerInfo};
 
 const BERT_MAX_LENGTH: usize = 512;
 const BERT_CLS_TOKEN: &str = "[CLS]";

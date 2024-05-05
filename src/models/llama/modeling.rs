@@ -1,13 +1,10 @@
 use std::sync::Arc;
 
-use anyhow::{Error, Result};
+use anyhow::Result;
 use candle_core::{DType, Device, Module, Tensor};
 use candle_nn::{
-    embedding, linear_no_bias,
-    ops::{dropout, softmax_last_dim},
-    rms_norm,
-    rotary_emb::rope,
-    Dropout, Embedding, Linear, RmsNorm, VarBuilder,
+    embedding, linear_no_bias, ops::softmax_last_dim, rms_norm, rotary_emb::rope, Dropout,
+    Embedding, Linear, RmsNorm, VarBuilder,
 };
 
 use crate::{
