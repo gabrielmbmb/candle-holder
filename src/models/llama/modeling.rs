@@ -123,7 +123,8 @@ impl LlamaAttention {
             .contiguous()?;
         let value_states = value_states
             .reshape((b_sz, seq_len, self.num_key_value_heads, self.head_dim))?
-            .transpose(1, 2)?;
+            .transpose(1, 2)?
+            .contiguous()?;
 
         let (query_states, key_states) =
             self.rotary_emb
@@ -205,12 +206,13 @@ impl LlamaMLP {
         })
     }
 
-    fn forward(&self, x: &Tensor) -> candle_core::Result<Tensor> {
+    fn forward(&self, x: &Tensor) -> Result<Tensor> {
         let x = self
             .act
             .forward(&self.gate_proj.forward(x)?)?
-            .matmul(&self.up_proj.forward(x)?)?;
-        self.down_proj.forward(&x)
+            .mul(&self.up_proj.forward(x)?)?;
+        let x = self.down_proj.forward(&x)?;
+        Ok(x)
     }
 }
 
@@ -249,14 +251,27 @@ impl LlamaDecoderLayer {
     }
 
     fn forward(&self, hidden_states: &Tensor, causal_mask: &Tensor) -> Result<Tensor> {
+        let residual = hidden_states;
+
+        // Self Attention
         let hidden_states = self.input_layernorm.forward(hidden_states)?;
-        self.self_attn.forward(&hidden_states, causal_mask)
+        let hidden_states = self.self_attn.forward(&hidden_states, causal_mask)?;
+        let hidden_states = (residual + hidden_states)?;
+
+        // Fully connected
+        let residual = &hidden_states;
+        let hidden_states = self.post_attention_layernorm.forward(&hidden_states)?;
+        let hidden_states = self.mlp.forward(&hidden_states)?;
+        let hidden_states = (residual + hidden_states)?;
+
+        Ok(hidden_states)
     }
 }
 
 pub struct Llama {
     embed_tokens: Embedding,
     layers: Vec<LlamaDecoderLayer>,
+    norm: RmsNorm,
 }
 
 impl Llama {
@@ -269,6 +284,7 @@ impl Llama {
             config.rope_theta.unwrap_or_default(),
             vb.device(),
         )?);
+        let norm = rms_norm(config.hidden_size, config.rms_norm_eps, vb.pp("norm"))?;
         let layers = (0..config.num_hidden_layers)
             .map(|index| {
                 LlamaDecoderLayer::load(
@@ -281,15 +297,18 @@ impl Llama {
         Ok(Self {
             embed_tokens,
             layers,
+            norm,
         })
     }
 
     pub fn forward(&self, input_ids: &Tensor, attention_mask: &Tensor) -> Result<Tensor> {
-        let hidden_states = self.embed_tokens.forward(input_ids)?;
+        let mut hidden_states = self.embed_tokens.forward(input_ids)?;
         let causal_mask = prepare_4d_causal_attention_mask(attention_mask, DType::F32)?;
-        let first_layer = self.layers.first().unwrap();
-        let x = first_layer.forward(&hidden_states, &causal_mask)?;
-        Ok(x)
+        for layer in self.layers.iter() {
+            hidden_states = layer.forward(&hidden_states, &causal_mask)?;
+        }
+        let hidden_states = self.norm.forward(&hidden_states)?;
+        Ok(hidden_states)
     }
 }
 
