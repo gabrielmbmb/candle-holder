@@ -11,6 +11,7 @@ use crate::models::bert::{
 use crate::models::llama::modeling::{LlamaModel, LLAMA_DTYPE};
 use crate::tokenizer::BatchEncoding;
 use crate::utils::{from_pretrained, FromPretrainedParameters};
+use crate::LlamaForCausalLM;
 
 #[macro_export]
 macro_rules! impl_from_pretrained_method {
@@ -96,9 +97,19 @@ impl_auto_model_from_pretrained_method!(
     ("bert", BertForMaskedLM, BERT_DTYPE)
 );
 
-// Implement `from_pretrained` method for each model
+pub struct AutoModelForCausalLM {}
+
+impl_auto_model_from_pretrained_method!(
+    AutoModelForCausalLM,
+    ("llama", LlamaForCausalLM, LLAMA_DTYPE)
+);
+
+// Bert
 impl_from_pretrained_method!(BertModel, BERT_DTYPE);
 impl_from_pretrained_method!(BertForSequenceClassification, BERT_DTYPE);
 impl_from_pretrained_method!(BertForTokenClassification, BERT_DTYPE);
 impl_from_pretrained_method!(BertForMaskedLM, BERT_DTYPE);
+
+// Llama
 impl_from_pretrained_method!(LlamaModel, LLAMA_DTYPE);
+impl_from_pretrained_method!(LlamaForCausalLM, LLAMA_DTYPE);

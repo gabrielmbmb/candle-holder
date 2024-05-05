@@ -19,7 +19,7 @@ pub use models::bert::{
     BertForMaskedLM, BertForSequenceClassification, BertForTokenClassification, BertModel,
     BertTokenizer,
 };
-pub use models::llama::{LlamaModel, LlamaTokenizer};
+pub use models::llama::{LlamaForCausalLM, LlamaModel, LlamaTokenizer};
 pub use models::roberta::RobertaTokenizer;
 
 // Pipelines

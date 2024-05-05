@@ -333,3 +333,35 @@ impl PreTrainedModel for LlamaModel {
         &self.config.pretrained_config
     }
 }
+
+pub struct LlamaForCausalLM {
+    model: Llama,
+    lm_head: Linear,
+    config: LlamaConfig,
+}
+
+impl PreTrainedModel for LlamaForCausalLM {
+    fn load(vb: VarBuilder, config: serde_json::Value) -> Result<Self> {
+        let config: LlamaConfig = serde_json::from_value(config)?;
+        let model = Llama::load(vb.pp("model"), &config)?;
+        let lm_head = linear_no_bias(config.hidden_size, config.vocab_size, vb.pp("lm_head"))?;
+
+        Ok(Self {
+            model,
+            lm_head,
+            config,
+        })
+    }
+
+    fn forward(&self, encodings: &BatchEncoding) -> Result<Tensor> {
+        let outputs = self
+            .model
+            .forward(encodings.get_input_ids(), encodings.get_attention_mask())?;
+        let logits = self.lm_head.forward(&outputs)?;
+        Ok(logits)
+    }
+
+    fn config(&self) -> &PretrainedConfig {
+        &self.config.pretrained_config
+    }
+}
