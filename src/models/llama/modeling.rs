@@ -10,7 +10,7 @@ use candle_nn::{
 use crate::{
     config::PretrainedConfig,
     model::PreTrainedModel,
-    model_utils::{prepare_4d_causal_attention_mask, repeat_kv},
+    model_utils::{prepare_4d_causal_attention_mask, repeat_kv, DynamicCache},
     tokenizer::BatchEncoding,
 };
 
@@ -103,7 +103,14 @@ impl LlamaAttention {
         })
     }
 
-    fn forward(&self, hidden_states: &Tensor, causal_mask: &Tensor) -> Result<Tensor> {
+    fn forward(
+        &self,
+        hidden_states: &Tensor,
+        causal_mask: &Tensor,
+        index_pos: usize,
+        layer_idx: usize,
+        cache: Option<&mut DynamicCache>,
+    ) -> Result<Tensor> {
         let (b_sz, seq_len, hidden_size) = hidden_states.dims3()?;
 
         let query_states = self.q_proj.forward(hidden_states)?;
@@ -118,14 +125,19 @@ impl LlamaAttention {
             .reshape((b_sz, seq_len, self.num_key_value_heads, self.head_dim))?
             .transpose(1, 2)?
             .contiguous()?;
-        let value_states = value_states
+        let mut value_states = value_states
             .reshape((b_sz, seq_len, self.num_key_value_heads, self.head_dim))?
             .transpose(1, 2)?
             .contiguous()?;
 
-        let (query_states, key_states) =
+        let (query_states, mut key_states) =
             self.rotary_emb
-                .apply_rotary_pos_emb(&query_states, &key_states, 0)?;
+                .apply_rotary_pos_emb(&query_states, &key_states, index_pos)?;
+
+        if let Some(cache) = cache {
+            (key_states, value_states) =
+                cache.update_key_states(key_states, value_states, layer_idx)?;
+        }
 
         let key_states = repeat_kv(key_states, self.num_key_value_groups)?;
         let value_states = repeat_kv(value_states, self.num_key_value_groups)?;
@@ -247,12 +259,21 @@ impl LlamaDecoderLayer {
         })
     }
 
-    fn forward(&self, hidden_states: &Tensor, causal_mask: &Tensor) -> Result<Tensor> {
+    fn forward(
+        &self,
+        hidden_states: &Tensor,
+        causal_mask: &Tensor,
+        index_pos: usize,
+        layer_idx: usize,
+        cache: Option<&mut DynamicCache>,
+    ) -> Result<Tensor> {
         let residual = hidden_states;
 
         // Self Attention
         let hidden_states = self.input_layernorm.forward(hidden_states)?;
-        let hidden_states = self.self_attn.forward(&hidden_states, causal_mask)?;
+        let hidden_states =
+            self.self_attn
+                .forward(&hidden_states, causal_mask, index_pos, layer_idx, cache)?;
         let hidden_states = (residual + hidden_states)?;
 
         // Fully connected
@@ -298,11 +319,23 @@ impl Llama {
         })
     }
 
-    pub fn forward(&self, input_ids: &Tensor, attention_mask: &Tensor) -> Result<Tensor> {
+    pub fn forward(
+        &self,
+        input_ids: &Tensor,
+        attention_mask: &Tensor,
+        index_pos: usize,
+        mut cache: Option<&mut DynamicCache>,
+    ) -> Result<Tensor> {
         let mut hidden_states = self.embed_tokens.forward(input_ids)?;
         let causal_mask = prepare_4d_causal_attention_mask(attention_mask, DType::F32)?;
-        for layer in self.layers.iter() {
-            hidden_states = layer.forward(&hidden_states, &causal_mask)?;
+        for (layer_idx, layer) in self.layers.iter().enumerate() {
+            hidden_states = layer.forward(
+                &hidden_states,
+                &causal_mask,
+                index_pos,
+                layer_idx,
+                cache.as_deref_mut(),
+            )?;
         }
         let hidden_states = self.norm.forward(&hidden_states)?;
         Ok(hidden_states)
@@ -322,8 +355,27 @@ impl PreTrainedModel for LlamaModel {
     }
 
     fn forward(&self, encodings: &BatchEncoding) -> Result<Tensor> {
-        self.model
-            .forward(encodings.get_input_ids(), encodings.get_attention_mask())
+        self.model.forward(
+            encodings.get_input_ids(),
+            encodings.get_attention_mask(),
+            // TODO: hardcoded for now
+            0,
+            None,
+        )
+    }
+
+    fn forward_with_cache(
+        &self,
+        encodings: &BatchEncoding,
+        index_pos: usize,
+        cache: &mut DynamicCache,
+    ) -> Result<Tensor> {
+        self.model.forward(
+            encodings.get_input_ids(),
+            encodings.get_attention_mask(),
+            index_pos,
+            Some(cache),
+        )
     }
 
     fn config(&self) -> &PretrainedConfig {
@@ -351,9 +403,29 @@ impl PreTrainedModel for LlamaForCausalLM {
     }
 
     fn forward(&self, encodings: &BatchEncoding) -> Result<Tensor> {
-        let outputs = self
-            .model
-            .forward(encodings.get_input_ids(), encodings.get_attention_mask())?;
+        let outputs = self.model.forward(
+            encodings.get_input_ids(),
+            encodings.get_attention_mask(),
+            // TODO: hardcoded for now
+            0,
+            None,
+        )?;
+        let logits = self.lm_head.forward(&outputs)?;
+        Ok(logits)
+    }
+
+    fn forward_with_cache(
+        &self,
+        encodings: &BatchEncoding,
+        index_pos: usize,
+        cache: &mut DynamicCache,
+    ) -> Result<Tensor> {
+        let outputs = self.model.forward(
+            encodings.get_input_ids(),
+            encodings.get_attention_mask(),
+            index_pos,
+            Some(cache),
+        )?;
         let logits = self.lm_head.forward(&outputs)?;
         Ok(logits)
     }

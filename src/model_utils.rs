@@ -34,3 +34,39 @@ pub fn prepare_4d_causal_attention_mask(attention_mask: &Tensor, dtype: DType) -
     let causal_mask = mask.where_cond(&on_true, &inverted_mask)?.to_dtype(dtype)?;
     Ok(causal_mask)
 }
+
+pub struct DynamicCache {
+    key_states: Vec<Tensor>,
+    value_states: Vec<Tensor>,
+}
+
+impl DynamicCache {
+    pub fn new() -> Self {
+        Self {
+            key_states: vec![],
+            value_states: vec![],
+        }
+    }
+
+    pub fn update_key_states(
+        &mut self,
+        key_states: Tensor,
+        value_states: Tensor,
+        layer_idx: usize,
+    ) -> Result<(Tensor, Tensor)> {
+        if self.key_states.len() <= layer_idx {
+            self.key_states.push(key_states);
+            self.value_states.push(value_states);
+        } else {
+            self.key_states[layer_idx] =
+                Tensor::cat(&[&self.key_states[layer_idx], &key_states], D::Minus2)?;
+            self.value_states[layer_idx] =
+                Tensor::cat(&[&self.value_states[layer_idx], &key_states], D::Minus2)?;
+        }
+
+        Ok((
+            self.key_states[layer_idx].clone(),
+            self.value_states[layer_idx].clone(),
+        ))
+    }
+}

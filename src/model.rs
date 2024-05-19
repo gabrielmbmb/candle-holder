@@ -1,8 +1,11 @@
+use std::sync::Arc;
+
 use anyhow::{bail, Result};
 use candle_core::{Device, Tensor};
 use candle_nn::VarBuilder;
 
 use crate::config::PretrainedConfig;
+use crate::model_utils::DynamicCache;
 use crate::models::bert::{
     BertForMaskedLM, BertForSequenceClassification, BertForTokenClassification, BertModel,
     BERT_DTYPE,
@@ -66,6 +69,14 @@ pub trait PreTrainedModel {
         Self: Sized;
     fn config(&self) -> &PretrainedConfig;
     fn forward(&self, encodings: &BatchEncoding) -> Result<Tensor>;
+    fn forward_with_cache(
+        &self,
+        encodings: &BatchEncoding,
+        index_pos: usize,
+        cache: &mut DynamicCache,
+    ) -> Result<Tensor> {
+        unimplemented!("forward_with_cache not implemented")
+    }
 }
 
 pub struct AutoModel {}

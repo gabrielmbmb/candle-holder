@@ -9,7 +9,7 @@ pub mod utils;
 // Model factory structs
 pub use model::{
     AutoModel, AutoModelForCausalLM, AutoModelForMaskedLM, AutoModelForSequenceClassification,
-    AutoModelForTokenClassification,
+    AutoModelForTokenClassification, PreTrainedModel,
 };
 pub use tokenizer::{AutoTokenizer, Padding};
 pub use utils::FromPretrainedParameters;
