@@ -1,0 +1,12 @@
+{
+    "crates": [
+        {
+            "root_module": "src/lib.rs",
+            "edition": "2018",
+            "deps": [],
+            "exclude": [
+                ".venv"
+            ]
+        }
+    ]
+}
