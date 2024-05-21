@@ -1,9 +1,10 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use anyhow::Result;
 use candle_core::{DType, Device};
 use candle_nn::VarBuilder;
 use hf_hub::{api::sync::ApiBuilder, Repo, RepoType};
+
+use crate::error::Result;
 
 #[derive(Debug, Clone)]
 pub struct FromPretrainedParameters {

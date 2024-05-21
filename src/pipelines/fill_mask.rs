@@ -3,7 +3,7 @@ use candle_core::{Device, Tensor, D};
 use candle_nn::ops::softmax;
 
 use crate::{
-    model::PreTrainedModel,
+    model::{ForwardParams, PreTrainedModel},
     tokenizer::{BatchEncoding, Tokenizer},
     utils::FromPretrainedParameters,
     AutoModelForMaskedLM, AutoTokenizer, Padding,
@@ -147,7 +147,11 @@ impl FillMaskPipeline {
     ) -> Result<Vec<Vec<FillMaskResult>>> {
         let options = options.unwrap_or_default();
         let (encodings, masked_index) = self.preprocess(vec![input.into()])?;
-        let output = self.model.forward(&encodings)?;
+        let output = self.model.forward(ForwardParams {
+            input_ids: Some(encodings.get_input_ids()),
+            token_type_ids: Some(encodings.get_token_type_ids()),
+            ..Default::default()
+        })?;
         Ok(self.postprocess(&output, encodings, masked_index, options.top_k)?[0].clone())
     }
 
@@ -159,12 +163,16 @@ impl FillMaskPipeline {
         let options = options.unwrap_or_default();
         let inputs: Vec<String> = inputs.into_iter().map(|x| x.into()).collect();
         let (encodings, masked_index) = self.preprocess(inputs)?;
-        let output = self.model.forward(&encodings)?;
+        let output = self.model.forward(ForwardParams {
+            input_ids: Some(encodings.get_input_ids()),
+            token_type_ids: Some(encodings.get_token_type_ids()),
+            ..Default::default()
+        })?;
         self.postprocess(&output, encodings, masked_index, options.top_k)
     }
 }
 
-fn topk<N: PartialOrd + Clone>(vec: &[N], k: usize) -> Vec<(N, u32)> {
+pub fn topk<N: PartialOrd + Clone>(vec: &[N], k: usize) -> Vec<(N, u32)> {
     if k == 0 {
         return vec![];
     }

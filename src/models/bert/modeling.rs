@@ -1,5 +1,3 @@
-use crate::{config::PretrainedConfig, model::PreTrainedModel, tokenizer::BatchEncoding};
-use anyhow::Result;
 use candle_core::{DType, IndexOp, Module, Tensor};
 use candle_nn::{
     embedding, layer_norm, linear, ops::softmax, Dropout, Embedding, LayerNorm, Linear, VarBuilder,
@@ -7,6 +5,12 @@ use candle_nn::{
 use std::sync::Arc;
 
 use super::config::{BertConfig, HiddenAct};
+
+use crate::{
+    config::PretrainedConfig,
+    error::{Error, Result},
+    model::{ForwardParams, PreTrainedModel},
+};
 
 pub const BERT_DTYPE: DType = DType::F32;
 
@@ -479,10 +483,15 @@ impl PreTrainedModel for BertModel {
         Ok(Self { model, config })
     }
 
-    fn forward(&self, encodings: &BatchEncoding) -> Result<Tensor> {
-        let (sequence_output, pooled_output) = self
-            .model
-            .forward(encodings.get_input_ids(), encodings.get_token_type_ids())?;
+    fn forward(&self, params: ForwardParams) -> Result<Tensor> {
+        let (sequence_output, pooled_output) = self.model.forward(
+            params
+                .get_input_ids()
+                .ok_or(Error::MissingForwardParam("input_ids".to_string()))?,
+            params
+                .get_token_type_ids()
+                .ok_or(Error::MissingForwardParam("token_type_ids".to_string()))?,
+        )?;
         if let Some(pooled_output) = pooled_output {
             return Ok(pooled_output);
         }
@@ -520,10 +529,15 @@ impl PreTrainedModel for BertForSequenceClassification {
         })
     }
 
-    fn forward(&self, encodings: &BatchEncoding) -> Result<Tensor> {
-        let (_, pooled_output) = self
-            .model
-            .forward(encodings.get_input_ids(), encodings.get_token_type_ids())?;
+    fn forward(&self, params: ForwardParams) -> Result<Tensor> {
+        let (_, pooled_output) = self.model.forward(
+            params
+                .get_input_ids()
+                .ok_or(Error::MissingForwardParam("input_ids".to_string()))?,
+            params
+                .get_token_type_ids()
+                .ok_or(Error::MissingForwardParam("token_type_ids".to_string()))?,
+        )?;
         let pooled_output = self.dropout.forward(&pooled_output.unwrap(), false)?;
         let logits = self.classifier.forward(&pooled_output)?;
         Ok(logits)
@@ -560,10 +574,15 @@ impl PreTrainedModel for BertForTokenClassification {
         })
     }
 
-    fn forward(&self, encodings: &BatchEncoding) -> Result<Tensor> {
-        let sequence_output = self
-            .model
-            .forward_return_sequence(encodings.get_input_ids(), encodings.get_token_type_ids())?;
+    fn forward(&self, params: ForwardParams) -> Result<Tensor> {
+        let sequence_output = self.model.forward_return_sequence(
+            params
+                .get_input_ids()
+                .ok_or(Error::MissingForwardParam("input_ids".to_string()))?,
+            params
+                .get_token_type_ids()
+                .ok_or(Error::MissingForwardParam("token_type_ids".to_string()))?,
+        )?;
         let sequence_output = self.dropout.forward(&sequence_output, false)?;
         let logits = self.classifier.forward(&sequence_output)?;
         Ok(logits)
@@ -592,10 +611,15 @@ impl PreTrainedModel for BertForMaskedLM {
         Ok(Self { model, cls, config })
     }
 
-    fn forward(&self, encodings: &BatchEncoding) -> Result<Tensor> {
-        let (sequence_output, _) = self
-            .model
-            .forward(encodings.get_input_ids(), encodings.get_token_type_ids())?;
+    fn forward(&self, params: ForwardParams) -> Result<Tensor> {
+        let (sequence_output, _) = self.model.forward(
+            params
+                .get_input_ids()
+                .ok_or(Error::MissingForwardParam("input_ids".to_string()))?,
+            params
+                .get_token_type_ids()
+                .ok_or(Error::MissingForwardParam("token_type_ids".to_string()))?,
+        )?;
         let logits = self.cls.forward(&sequence_output)?;
         Ok(logits)
     }

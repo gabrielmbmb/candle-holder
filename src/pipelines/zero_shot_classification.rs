@@ -4,7 +4,7 @@ use candle_nn::ops::softmax;
 use dyn_fmt::AsStrFormatExt;
 
 use crate::{
-    model::PreTrainedModel,
+    model::{ForwardParams, PreTrainedModel},
     tokenizer::{BatchEncoding, Tokenizer},
     AutoModelForSequenceClassification, AutoTokenizer, FromPretrainedParameters, Padding,
 };
@@ -173,7 +173,11 @@ impl ZeroShotClassificationPipeline {
             .map(|label| label.as_ref().to_string())
             .collect();
         let encodings = self.preprocess(inputs, &candidate_labels, &options)?;
-        let output = self.model.forward(&encodings)?;
+        let output = self.model.forward(ForwardParams {
+            input_ids: Some(encodings.get_input_ids()),
+            token_type_ids: Some(encodings.get_token_type_ids()),
+            ..Default::default()
+        })?;
         Ok(self.postprocess(output, 1, &candidate_labels, options.multi_label)?[0].clone())
     }
 
@@ -191,7 +195,11 @@ impl ZeroShotClassificationPipeline {
             .map(|label| label.as_ref().to_string())
             .collect();
         let encodings = self.preprocess(inputs, &candidate_labels, &options)?;
-        let output = self.model.forward(&encodings)?;
+        let output = self.model.forward(ForwardParams {
+            input_ids: Some(encodings.get_input_ids()),
+            token_type_ids: Some(encodings.get_token_type_ids()),
+            ..Default::default()
+        })?;
         self.postprocess(
             output,
             num_sequences,

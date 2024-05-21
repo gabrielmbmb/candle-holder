@@ -5,7 +5,7 @@ use candle_core::{Device, IndexOp, Tensor, D};
 use tokenizers::Encoding;
 
 use crate::{
-    model::PreTrainedModel,
+    model::{ForwardParams, PreTrainedModel},
     tokenizer::{BatchEncoding, Tokenizer},
     AutoModelForTokenClassification, AutoTokenizer, FromPretrainedParameters, Padding,
 };
@@ -469,7 +469,11 @@ impl TokenClassificationPipeline {
         let options = options.unwrap_or_default();
         let inputs = vec![input.into()];
         let encodings = self.preprocess(inputs.clone())?;
-        let output = self.model.forward(&encodings)?;
+        let output = self.model.forward(ForwardParams {
+            input_ids: Some(encodings.get_input_ids()),
+            token_type_ids: Some(encodings.get_token_type_ids()),
+            ..Default::default()
+        })?;
         let entities = self
             .postprocess(
                 inputs,
@@ -493,7 +497,11 @@ impl TokenClassificationPipeline {
         let options = options.unwrap_or_default();
         let inputs: Vec<String> = inputs.into_iter().map(|x| x.into()).collect();
         let encodings = self.preprocess(inputs.clone())?;
-        let output = self.model.forward(&encodings)?;
+        let output = self.model.forward(ForwardParams {
+            input_ids: Some(encodings.get_input_ids()),
+            token_type_ids: Some(encodings.get_token_type_ids()),
+            ..Default::default()
+        })?;
         self.postprocess(
             inputs,
             encodings.get_input_ids().to_vec2::<u32>()?,

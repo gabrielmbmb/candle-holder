@@ -1,10 +1,9 @@
-use std::sync::Arc;
-
-use anyhow::{bail, Result};
 use candle_core::{Device, Tensor};
 use candle_nn::VarBuilder;
 
+use crate::bail;
 use crate::config::PretrainedConfig;
+use crate::error::Result;
 use crate::model_utils::DynamicCache;
 use crate::models::bert::{
     BertForMaskedLM, BertForSequenceClassification, BertForTokenClassification, BertModel,
@@ -12,7 +11,6 @@ use crate::models::bert::{
 };
 
 use crate::models::llama::modeling::{LlamaModel, LLAMA_DTYPE};
-use crate::tokenizer::BatchEncoding;
 use crate::utils::{from_pretrained, FromPretrainedParameters};
 use crate::LlamaForCausalLM;
 
@@ -47,7 +45,7 @@ macro_rules! impl_auto_model_from_pretrained_method {
                 let config = model_info.config()?;
                 let model_type = config["model_type"].as_str().unwrap();
 
-                let model: Result<Box<dyn PreTrainedModel>, anyhow::Error> = match model_type {
+                let model: Result<Box<dyn PreTrainedModel>> = match model_type {
                     $(
                         $model_type => {
                             let vb = model_info.vb($dtype, device)?;
@@ -63,17 +61,61 @@ macro_rules! impl_auto_model_from_pretrained_method {
     };
 }
 
+pub struct ForwardParams<'a> {
+    pub input_ids: Option<&'a Tensor>,
+    pub attention_mask: Option<&'a Tensor>,
+    pub token_type_ids: Option<&'a Tensor>,
+    pub position_ids: Option<&'a Tensor>,
+}
+
+impl<'a> ForwardParams<'a> {
+    pub fn new(
+        input_ids: Option<&'a Tensor>,
+        attention_mask: Option<&'a Tensor>,
+        token_type_ids: Option<&'a Tensor>,
+        position_ids: Option<&'a Tensor>,
+    ) -> Self {
+        Self {
+            input_ids,
+            attention_mask,
+            token_type_ids,
+            position_ids,
+        }
+    }
+
+    pub fn get_input_ids(&self) -> Option<&'a Tensor> {
+        self.input_ids
+    }
+
+    pub fn get_attention_mask(&self) -> Option<&'a Tensor> {
+        self.attention_mask
+    }
+
+    pub fn get_token_type_ids(&self) -> Option<&'a Tensor> {
+        self.token_type_ids
+    }
+
+    pub fn get_position_ids(&self) -> Option<&'a Tensor> {
+        self.position_ids
+    }
+}
+
+impl<'a> Default for ForwardParams<'a> {
+    fn default() -> Self {
+        Self::new(None, None, None, None)
+    }
+}
+
 pub trait PreTrainedModel {
     fn load(vb: VarBuilder, config: serde_json::Value) -> Result<Self>
     where
         Self: Sized;
     fn config(&self) -> &PretrainedConfig;
-    fn forward(&self, encodings: &BatchEncoding) -> Result<Tensor>;
+    fn forward(&self, params: ForwardParams) -> Result<Tensor>;
     fn forward_with_cache(
         &self,
-        encodings: &BatchEncoding,
-        index_pos: usize,
-        cache: &mut DynamicCache,
+        _params: ForwardParams,
+        _cache: &mut DynamicCache,
     ) -> Result<Tensor> {
         unimplemented!("forward_with_cache not implemented")
     }

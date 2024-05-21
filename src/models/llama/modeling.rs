@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use anyhow::Result;
 use candle_core::{DType, Device, Module, Tensor};
 use candle_nn::{
     embedding, linear_no_bias, ops::softmax_last_dim, rms_norm, rotary_emb::rope, Dropout,
@@ -9,9 +8,10 @@ use candle_nn::{
 
 use crate::{
     config::PretrainedConfig,
+    error::{Error, Result},
+    model::ForwardParams,
     model::PreTrainedModel,
     model_utils::{prepare_4d_causal_attention_mask, repeat_kv, DynamicCache},
-    tokenizer::BatchEncoding,
 };
 
 use super::config::{HiddenAct, LlamaConfig};
@@ -354,28 +354,34 @@ impl PreTrainedModel for LlamaModel {
         Ok(Self { model, config })
     }
 
-    fn forward(&self, encodings: &BatchEncoding) -> Result<Tensor> {
-        self.model.forward(
-            encodings.get_input_ids(),
-            encodings.get_attention_mask(),
-            // TODO: hardcoded for now
+    fn forward(&self, params: ForwardParams) -> Result<Tensor> {
+        Ok(self.model.forward(
+            params
+                .get_input_ids()
+                .ok_or(Error::MissingForwardParam("input_ids".to_string()))?,
+            params
+                .get_token_type_ids()
+                .ok_or(Error::MissingForwardParam("token_type_ids".to_string()))?,
             0,
             None,
-        )
+        )?)
     }
 
     fn forward_with_cache(
         &self,
-        encodings: &BatchEncoding,
-        index_pos: usize,
+        params: ForwardParams,
         cache: &mut DynamicCache,
     ) -> Result<Tensor> {
-        self.model.forward(
-            encodings.get_input_ids(),
-            encodings.get_attention_mask(),
-            index_pos,
+        Ok(self.model.forward(
+            params
+                .get_input_ids()
+                .ok_or(Error::MissingForwardParam("input_ids".to_string()))?,
+            params
+                .get_token_type_ids()
+                .ok_or(Error::MissingForwardParam("token_type_ids".to_string()))?,
+            0,
             Some(cache),
-        )
+        )?)
     }
 
     fn config(&self) -> &PretrainedConfig {
@@ -402,10 +408,14 @@ impl PreTrainedModel for LlamaForCausalLM {
         })
     }
 
-    fn forward(&self, encodings: &BatchEncoding) -> Result<Tensor> {
+    fn forward(&self, params: ForwardParams) -> Result<Tensor> {
         let outputs = self.model.forward(
-            encodings.get_input_ids(),
-            encodings.get_attention_mask(),
+            params
+                .get_input_ids()
+                .ok_or(Error::MissingForwardParam("input_ids".to_string()))?,
+            params
+                .get_attention_mask()
+                .ok_or(Error::MissingForwardParam("input_ids".to_string()))?,
             // TODO: hardcoded for now
             0,
             None,
@@ -416,14 +426,17 @@ impl PreTrainedModel for LlamaForCausalLM {
 
     fn forward_with_cache(
         &self,
-        encodings: &BatchEncoding,
-        index_pos: usize,
+        params: ForwardParams,
         cache: &mut DynamicCache,
     ) -> Result<Tensor> {
         let outputs = self.model.forward(
-            encodings.get_input_ids(),
-            encodings.get_attention_mask(),
-            index_pos,
+            params
+                .get_input_ids()
+                .ok_or(Error::MissingForwardParam("input_ids".to_string()))?,
+            params
+                .get_attention_mask()
+                .ok_or(Error::MissingForwardParam("input_ids".to_string()))?,
+            0,
             Some(cache),
         )?;
         let logits = self.lm_head.forward(&outputs)?;

@@ -17,6 +17,7 @@ lazy_static = "1.4.0"
 serde = { version = "1.0.192", features = ["derive"] }
 serde_json = "1.0.108"
 tokenizers = { version = "0.19.1", features = ["http"] }
+thiserror = "1.0.61"
 
 [features]
 metal = ["candle-core/metal", "candle-nn/metal", "candle-metal-kernels"]
