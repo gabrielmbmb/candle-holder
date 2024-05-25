@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use candle_core::{DType, Device, Module, Tensor};
+use candle_core::{DType, Device, Module, Tensor, D};
 use candle_nn::{
     embedding, linear_no_bias, ops::softmax_last_dim, rms_norm, rotary_emb::rope, Dropout,
     Embedding, Linear, RmsNorm, VarBuilder,
@@ -19,8 +19,7 @@ use super::config::{HiddenAct, LlamaConfig};
 pub const LLAMA_DTYPE: DType = DType::F16;
 
 pub struct LlamaRotaryEmbedding {
-    cos_cached: Tensor,
-    sin_cached: Tensor,
+    inv_freq: Tensor,
 }
 
 impl LlamaRotaryEmbedding {
@@ -30,28 +29,25 @@ impl LlamaRotaryEmbedding {
             .map(|i| 1f32 / base.powf(i as f32 / dim as f32))
             .collect();
         let inv_freq = Tensor::new(inv_freq.as_slice(), device)?;
-        let emb = Tensor::arange(0, max_position_embeddings as u32, device)?
-            .to_dtype(DType::F32)?
-            .reshape((max_position_embeddings, 1))?
-            .matmul(&inv_freq.reshape((1, inv_freq.elem_count()))?)?;
-        let cos_cached = emb.cos()?.to_dtype(LLAMA_DTYPE)?;
-        let sin_cached = emb.sin()?.to_dtype(LLAMA_DTYPE)?;
 
-        Ok(Self {
-            cos_cached,
-            sin_cached,
-        })
+        Ok(Self { inv_freq })
     }
 
     fn apply_rotary_pos_emb(
         &self,
         q: &Tensor,
         k: &Tensor,
-        index_pos: usize,
+        position_ids: &Tensor,
     ) -> Result<(Tensor, Tensor)> {
-        let (_, _, seq_len, _) = q.dims4()?;
-        let cos = self.cos_cached.narrow(0, index_pos, seq_len)?;
-        let sin = self.sin_cached.narrow(0, index_pos, seq_len)?;
+        let inv_freq_expanded = self.inv_freq.reshape((1, self.inv_freq.dims1()?, 1))?;
+        let position_ids_expanded = position_ids.unsqueeze(0)?.to_dtype(DType::F32)?;
+        let emb = inv_freq_expanded
+            .matmul(&position_ids_expanded)?
+            .transpose(1, 2)?
+            .squeeze(0)?;
+        let dtype = q.dtype();
+        let cos = emb.cos()?.to_dtype(dtype)?;
+        let sin = emb.sin()?.to_dtype(dtype)?;
         let q_embed = rope(q, &cos, &sin)?;
         let k_embed = rope(k, &cos, &sin)?;
         Ok((q_embed, k_embed))
@@ -107,7 +103,7 @@ impl LlamaAttention {
         &self,
         hidden_states: &Tensor,
         causal_mask: &Tensor,
-        index_pos: usize,
+        position_ids: &Tensor,
         layer_idx: usize,
         cache: Option<&mut DynamicCache>,
     ) -> Result<Tensor> {
@@ -132,7 +128,7 @@ impl LlamaAttention {
 
         let (query_states, mut key_states) =
             self.rotary_emb
-                .apply_rotary_pos_emb(&query_states, &key_states, index_pos)?;
+                .apply_rotary_pos_emb(&query_states, &key_states, &position_ids)?;
 
         if let Some(cache) = cache {
             (key_states, value_states) =
@@ -263,7 +259,7 @@ impl LlamaDecoderLayer {
         &self,
         hidden_states: &Tensor,
         causal_mask: &Tensor,
-        index_pos: usize,
+        position_ids: &Tensor,
         layer_idx: usize,
         cache: Option<&mut DynamicCache>,
     ) -> Result<Tensor> {
@@ -273,7 +269,7 @@ impl LlamaDecoderLayer {
         let hidden_states = self.input_layernorm.forward(hidden_states)?;
         let hidden_states =
             self.self_attn
-                .forward(&hidden_states, causal_mask, index_pos, layer_idx, cache)?;
+                .forward(&hidden_states, causal_mask, position_ids, layer_idx, cache)?;
         let hidden_states = (residual + hidden_states)?;
 
         // Fully connected
@@ -319,22 +315,30 @@ impl Llama {
         })
     }
 
-    pub fn forward(
-        &self,
-        input_ids: &Tensor,
-        attention_mask: &Tensor,
-        index_pos: usize,
-        mut cache: Option<&mut DynamicCache>,
-    ) -> Result<Tensor> {
+    pub fn forward(&self, mut params: ForwardParams) -> Result<Tensor> {
+        let input_ids = params
+            .get_input_ids()
+            .ok_or(Error::MissingForwardParam("input_ids".to_string()))?;
+        let attention_mask = params
+            .get_attention_mask()
+            .ok_or(Error::MissingForwardParam("attention_mask".to_string()))?;
+        let position_ids = match params.get_position_ids().cloned() {
+            Some(position_ids) => position_ids,
+            None => {
+                let seq_len = input_ids.dims2()?.1 as u8;
+                Tensor::arange(0u8, seq_len, input_ids.device())?.unsqueeze(0)?
+            }
+        };
+
         let mut hidden_states = self.embed_tokens.forward(input_ids)?;
         let causal_mask = prepare_4d_causal_attention_mask(attention_mask, DType::F32)?;
         for (layer_idx, layer) in self.layers.iter().enumerate() {
             hidden_states = layer.forward(
                 &hidden_states,
                 &causal_mask,
-                index_pos,
+                &position_ids,
                 layer_idx,
-                cache.as_deref_mut(),
+                params.get_cache(),
             )?;
         }
         let hidden_states = self.norm.forward(&hidden_states)?;
@@ -355,33 +359,7 @@ impl PreTrainedModel for LlamaModel {
     }
 
     fn forward(&self, params: ForwardParams) -> Result<Tensor> {
-        Ok(self.model.forward(
-            params
-                .get_input_ids()
-                .ok_or(Error::MissingForwardParam("input_ids".to_string()))?,
-            params
-                .get_token_type_ids()
-                .ok_or(Error::MissingForwardParam("token_type_ids".to_string()))?,
-            0,
-            None,
-        )?)
-    }
-
-    fn forward_with_cache(
-        &self,
-        params: ForwardParams,
-        cache: &mut DynamicCache,
-    ) -> Result<Tensor> {
-        Ok(self.model.forward(
-            params
-                .get_input_ids()
-                .ok_or(Error::MissingForwardParam("input_ids".to_string()))?,
-            params
-                .get_token_type_ids()
-                .ok_or(Error::MissingForwardParam("token_type_ids".to_string()))?,
-            0,
-            Some(cache),
-        )?)
+        Ok(self.model.forward(params)?)
     }
 
     fn config(&self) -> &PretrainedConfig {
@@ -409,36 +387,7 @@ impl PreTrainedModel for LlamaForCausalLM {
     }
 
     fn forward(&self, params: ForwardParams) -> Result<Tensor> {
-        let outputs = self.model.forward(
-            params
-                .get_input_ids()
-                .ok_or(Error::MissingForwardParam("input_ids".to_string()))?,
-            params
-                .get_attention_mask()
-                .ok_or(Error::MissingForwardParam("input_ids".to_string()))?,
-            // TODO: hardcoded for now
-            0,
-            None,
-        )?;
-        let logits = self.lm_head.forward(&outputs)?;
-        Ok(logits)
-    }
-
-    fn forward_with_cache(
-        &self,
-        params: ForwardParams,
-        cache: &mut DynamicCache,
-    ) -> Result<Tensor> {
-        let outputs = self.model.forward(
-            params
-                .get_input_ids()
-                .ok_or(Error::MissingForwardParam("input_ids".to_string()))?,
-            params
-                .get_attention_mask()
-                .ok_or(Error::MissingForwardParam("input_ids".to_string()))?,
-            0,
-            Some(cache),
-        )?;
+        let outputs = self.model.forward(params)?;
         let logits = self.lm_head.forward(&outputs)?;
         Ok(logits)
     }

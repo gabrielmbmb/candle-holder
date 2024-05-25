@@ -66,6 +66,7 @@ pub struct ForwardParams<'a> {
     pub attention_mask: Option<&'a Tensor>,
     pub token_type_ids: Option<&'a Tensor>,
     pub position_ids: Option<&'a Tensor>,
+    pub cache: Option<&'a mut DynamicCache>,
 }
 
 impl<'a> ForwardParams<'a> {
@@ -74,12 +75,14 @@ impl<'a> ForwardParams<'a> {
         attention_mask: Option<&'a Tensor>,
         token_type_ids: Option<&'a Tensor>,
         position_ids: Option<&'a Tensor>,
+        cache: Option<&'a mut DynamicCache>,
     ) -> Self {
         Self {
             input_ids,
             attention_mask,
             token_type_ids,
             position_ids,
+            cache,
         }
     }
 
@@ -98,11 +101,15 @@ impl<'a> ForwardParams<'a> {
     pub fn get_position_ids(&self) -> Option<&'a Tensor> {
         self.position_ids
     }
+
+    pub fn get_cache(&mut self) -> Option<&mut DynamicCache> {
+        self.cache.as_deref_mut()
+    }
 }
 
 impl<'a> Default for ForwardParams<'a> {
     fn default() -> Self {
-        Self::new(None, None, None, None)
+        Self::new(None, None, None, None, None)
     }
 }
 
@@ -112,13 +119,6 @@ pub trait PreTrainedModel {
         Self: Sized;
     fn config(&self) -> &PretrainedConfig;
     fn forward(&self, params: ForwardParams) -> Result<Tensor>;
-    fn forward_with_cache(
-        &self,
-        _params: ForwardParams,
-        _cache: &mut DynamicCache,
-    ) -> Result<Tensor> {
-        unimplemented!("forward_with_cache not implemented")
-    }
 }
 
 pub struct AutoModel {}
