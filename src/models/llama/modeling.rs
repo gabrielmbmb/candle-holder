@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use candle_core::{DType, Device, Module, Tensor, D};
+use candle_core::{DType, Device, Module, Tensor};
 use candle_nn::{
     embedding, linear_no_bias, ops::softmax_last_dim, rms_norm, rotary_emb::rope, Dropout,
     Embedding, Linear, RmsNorm, VarBuilder,
@@ -23,7 +23,7 @@ pub struct LlamaRotaryEmbedding {
 }
 
 impl LlamaRotaryEmbedding {
-    fn new(dim: usize, max_position_embeddings: usize, base: f32, device: &Device) -> Result<Self> {
+    fn new(dim: usize, base: f32, device: &Device) -> Result<Self> {
         let inv_freq: Vec<_> = (0..dim)
             .step_by(2)
             .map(|i| 1f32 / base.powf(i as f32 / dim as f32))
@@ -294,7 +294,6 @@ impl Llama {
             embedding(config.vocab_size, config.hidden_size, vb.pp("embed_tokens"))?;
         let rotary_emb = Arc::new(LlamaRotaryEmbedding::new(
             config.hidden_size / config.num_attention_heads,
-            config.max_position_embeddings,
             config.rope_theta.unwrap_or_default(),
             vb.device(),
         )?);
