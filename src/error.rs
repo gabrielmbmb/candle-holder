@@ -2,11 +2,26 @@ use hf_hub::api::sync::ApiError;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[error("Forward param {0} cannot be None.")]
+    // Load model errors
+    #[error("Model weights not found in the repo.")]
+    ModelWeightsNotFound,
+
+    // `forward` method errors
+    #[error("Forward param {0} cannot be `None`.")]
     MissingForwardParam(String),
 
     #[error("{0}")]
     Msg(String),
+
+    // Wrapped errors from other crates
+    #[error(transparent)]
+    Wrapped(Box<dyn std::error::Error + Send + Sync>),
+}
+
+impl Error {
+    pub fn wrap(e: impl std::error::Error + Send + Sync + 'static) -> Self {
+        Error::Wrapped(Box::new(e))
+    }
 }
 
 impl From<candle_core::Error> for Error {

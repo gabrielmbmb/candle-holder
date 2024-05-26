@@ -1,13 +1,27 @@
-use std::{collections::HashMap, fs, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+    path::PathBuf,
+};
 
 use candle_core::{DType, Device};
 use candle_nn::VarBuilder;
-use hf_hub::{api::sync::ApiBuilder, Repo, RepoType};
+use hf_hub::{
+    api::sync::{ApiBuilder, ApiRepo},
+    Repo, RepoType,
+};
+use serde::{Deserialize, Serialize};
 
-use crate::{config::GenerationConfig, error::Result};
+use crate::{
+    config::GenerationConfig,
+    error::{Error, Result},
+};
 
 pub const MODEL_CONFIG_FILE: &str = "config.json";
 const MODEL_GENERATION_CONFIG_FILE: &str = "generation_config.json";
+const MODEL_SAFETENSORS_INDEX_FILE: &str = "model.safetensors.index.json";
+const MODEL_SAFETENSORS_FILE: &str = "model.safetensors";
+const MODEL_PYTORCH_FILE: &str = "pytorch_model.bin";
 
 #[derive(Debug, Clone)]
 pub struct FromPretrainedParameters {
@@ -32,8 +46,10 @@ pub struct ModelInfo {
     config: Option<serde_json::Value>,
     /// The generation configuration of the model loaded from the `generation_config.json` file.
     generation_config: Option<GenerationConfig>,
-    weights_file_path: PathBuf,
-    pub from_pth: bool,
+    /// The paths to the model weights files.
+    weights_file_paths: Vec<PathBuf>,
+    /// A flag indicating whether the model weights are stored in PyTorch format.
+    from_pth: bool,
 }
 
 impl ModelInfo {
@@ -49,9 +65,9 @@ impl ModelInfo {
     /// A `VarBuilder` containing the model weights.
     pub fn get_var_builder(&self, dtype: DType, device: &Device) -> Result<VarBuilder> {
         let vb = match self.from_pth {
-            true => VarBuilder::from_pth(&self.weights_file_path, dtype, device)?,
+            true => VarBuilder::from_pth(&self.weights_file_paths[0], dtype, device)?,
             false => unsafe {
-                VarBuilder::from_mmaped_safetensors(&[&self.weights_file_path], dtype, device)?
+                VarBuilder::from_mmaped_safetensors(&self.weights_file_paths, dtype, device)?
             },
         };
         Ok(vb)
@@ -102,6 +118,81 @@ fn load_generation_config(file_path: std::path::PathBuf) -> Result<GenerationCon
     Ok(generation_config)
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct SafetensorsMetadata {
+    total_size: usize,
+}
+
+/// Representation of the `model.safetensors.index.json` file which contains the metadata and
+/// weight map of the model.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct SafetensorsIndex {
+    /// Metadata of the model.
+    metadata: SafetensorsMetadata,
+    /// A map of the model weights, where the key is the layer name and the value is the file path
+    /// to the `safetensors` file containing the weights of that layer.
+    weight_map: HashMap<String, String>,
+}
+
+impl SafetensorsIndex {
+    /// Gets the list of `safetensors` files required to load the model.
+    ///
+    /// # Returns
+    ///
+    /// A list of `safetensors` files.
+    fn get_safetensors_files(&self) -> Vec<String> {
+        let mut files: Vec<String> = self
+            .weight_map
+            .values()
+            .cloned()
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
+        files.sort();
+        files
+    }
+}
+
+fn get_sharded_safetensors_files(api: &ApiRepo) -> Result<()> {
+    Ok(())
+}
+
+/// Loads the model weights from the Hugging Face Repository. It tries to first load the weights
+/// from the `model.safetensors.index.json` file (and the corresponding `safetensors` files), then
+/// from the `model.safetensors` file, and finally from the `pytorch_model.bin` file.
+///
+/// # Arguments
+///
+/// * `api` - The Hugging Face API repository.
+///
+/// # Returns
+///
+/// A tuple containing the paths to the model weights files and a flag indicating whether the
+/// weights are stored in PyTorch format.
+fn load_model_weights(api: &ApiRepo) -> Result<(Vec<PathBuf>, bool)> {
+    if let Ok(model_safetensors_index_file_path) = api.get(MODEL_SAFETENSORS_INDEX_FILE) {
+        let safetensors_index = fs::read_to_string(model_safetensors_index_file_path)?;
+        let safetensors_index: SafetensorsIndex = serde_json::from_str(&safetensors_index)?;
+        // Call `api.get to download the files
+        let safetensors_files = safetensors_index
+            .get_safetensors_files()
+            .iter()
+            .map(|file_name| api.get(&file_name).map_err(Error::wrap))
+            .collect::<Result<Vec<_>>>()?;
+        return Ok((safetensors_files, false));
+    }
+
+    if let Ok(model_safetensor_file_path) = api.get(MODEL_SAFETENSORS_FILE) {
+        return Ok((vec![model_safetensor_file_path], false));
+    }
+
+    if let Ok(model_pytorch_file_path) = api.get(MODEL_PYTORCH_FILE) {
+        return Ok((vec![model_pytorch_file_path], true));
+    }
+
+    Err(Error::ModelWeightsNotFound)
+}
+
 /// Loads all the required configuration files for loading a model from the Hugging Face Hub.
 ///
 /// # Arguments
@@ -143,20 +234,13 @@ pub fn from_pretrained<I: AsRef<str>>(
         Err(_) => None,
     };
 
-    // Get the model weights
-    let (weights_file_path, from_pth) = {
-        if let Ok(weights_file_path) = api.get("model.safetensors") {
-            (weights_file_path, false)
-        } else {
-            let weights_file_path = api.get("pytorch_model.bin")?;
-            (weights_file_path, true)
-        }
-    };
+    // Load the model weights
+    let (weights_file_paths, from_pth) = load_model_weights(&api)?;
 
     Ok(ModelInfo {
         config,
         generation_config: None,
-        weights_file_path,
+        weights_file_paths,
         from_pth,
     })
 }

@@ -28,7 +28,7 @@ macro_rules! impl_from_pretrained_method {
                     .get_config()
                     .expect("Model config not found. Cannot load the model.")
                     .clone();
-                let vb = model_info.vb($dtype, device)?;
+                let vb = model_info.get_var_builder($dtype, device)?;
                 Self::load(vb, config)
             }
         }
@@ -54,7 +54,7 @@ macro_rules! impl_auto_model_from_pretrained_method {
                 let model: Result<Box<dyn PreTrainedModel>> = match model_type {
                     $(
                         $model_type => {
-                            let vb = model_info.vb($dtype, device)?;
+                            let vb = model_info.get_var_builder($dtype, device)?;
                             Ok(Box::new($model_struct::load(vb, config)?))
                         },
                     )*
