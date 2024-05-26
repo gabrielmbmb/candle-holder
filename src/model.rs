@@ -24,7 +24,10 @@ macro_rules! impl_from_pretrained_method {
                 params: Option<FromPretrainedParameters>,
             ) -> Result<Self> {
                 let model_info = from_pretrained(repo_id, params)?;
-                let config = model_info.config()?;
+                let config = model_info
+                    .get_config()
+                    .expect("Model config not found. Cannot load the model.")
+                    .clone();
                 let vb = model_info.vb($dtype, device)?;
                 Self::load(vb, config)
             }
@@ -42,7 +45,10 @@ macro_rules! impl_auto_model_from_pretrained_method {
                 params: Option<FromPretrainedParameters>,
             ) -> Result<Box<dyn PreTrainedModel>> {
                 let model_info = from_pretrained(repo_id, params)?;
-                let config = model_info.config()?;
+                let config = model_info
+                    .get_config()
+                    .expect("Model config not found. Cannot load the model.")
+                    .clone();
                 let model_type = config["model_type"].as_str().unwrap();
 
                 let model: Result<Box<dyn PreTrainedModel>> = match model_type {
@@ -119,6 +125,9 @@ pub trait PreTrainedModel {
         Self: Sized;
     fn config(&self) -> &PretrainedConfig;
     fn forward(&self, params: ForwardParams) -> Result<Tensor>;
+    fn generate(&self, _params: ForwardParams) -> Result<Tensor> {
+        unimplemented!("generate method not implemented for this model");
+    }
 }
 
 pub struct AutoModel {}

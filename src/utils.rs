@@ -1,10 +1,13 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, fs, path::PathBuf};
 
 use candle_core::{DType, Device};
 use candle_nn::VarBuilder;
 use hf_hub::{api::sync::ApiBuilder, Repo, RepoType};
 
-use crate::error::Result;
+use crate::{config::GenerationConfig, error::Result};
+
+pub const MODEL_CONFIG_FILE: &str = "config.json";
+const MODEL_GENERATION_CONFIG_FILE: &str = "generation_config.json";
 
 #[derive(Debug, Clone)]
 pub struct FromPretrainedParameters {
@@ -23,14 +26,28 @@ impl Default for FromPretrainedParameters {
     }
 }
 
+/// An struct holding all the information required to load a model from the Hugging Face Hub.
 pub struct ModelInfo {
-    pub config_file_path: PathBuf,
-    pub weights_file_path: PathBuf,
+    /// The model configuration loaded from the `config.json` file.
+    config: Option<serde_json::Value>,
+    /// The generation configuration of the model loaded from the `generation_config.json` file.
+    generation_config: Option<GenerationConfig>,
+    weights_file_path: PathBuf,
     pub from_pth: bool,
 }
 
 impl ModelInfo {
-    pub fn vb(&self, dtype: DType, device: &Device) -> Result<VarBuilder> {
+    /// Loads the model weights from the provided paths into a `VarBuilder`.
+    ///
+    /// # Arguments
+    ///
+    /// - `dtype` - The data type of the model weights.
+    /// - `device` - The device on which the model weights should be loaded.
+    ///
+    /// # Returns
+    ///
+    /// A `VarBuilder` containing the model weights.
+    pub fn get_var_builder(&self, dtype: DType, device: &Device) -> Result<VarBuilder> {
         let vb = match self.from_pth {
             true => VarBuilder::from_pth(&self.weights_file_path, dtype, device)?,
             false => unsafe {
@@ -40,18 +57,63 @@ impl ModelInfo {
         Ok(vb)
     }
 
-    pub fn config(&self) -> Result<serde_json::Value> {
-        let config = std::fs::read_to_string(&self.config_file_path)?;
-        let json_config: serde_json::Value = serde_json::from_str(&config)?;
-        Ok(json_config)
+    /// Gets a reference to the model configuration.
+    pub fn get_config(&self) -> Option<&serde_json::Value> {
+        self.config.as_ref()
+    }
+
+    /// Gets a reference to the generation configuration of the model.
+    pub fn get_generation_config(&self) -> Option<&GenerationConfig> {
+        self.generation_config.as_ref()
     }
 }
 
 // TODO: function to convert old format to new format (gamma, beta) -> (weight, bias)
 // TODO: detect prefix
 
-pub fn from_pretrained<S: AsRef<str>>(
-    repo_id: S,
+/// Loads the model configuration from the provided file path.
+///
+/// # Arguments
+///
+/// * `file_path` - The path to the `config.json` file containing the model configuration.
+///
+/// # Returns
+///
+/// The loaded model configuration.
+pub fn load_model_config(file_path: std::path::PathBuf) -> Result<serde_json::Value> {
+    let model_config = fs::read_to_string(file_path)?;
+    let model_config = serde_json::from_str(&model_config)?;
+    Ok(model_config)
+}
+
+/// Loads the generation configuration of the model from the provided file path.
+///
+/// # Arguments
+///
+/// * `file_path` - The path of the `generation_config.json` file containing the generation
+/// configuration of the model.
+///
+/// # Returns
+///
+/// The loaded generation configuration.
+fn load_generation_config(file_path: std::path::PathBuf) -> Result<GenerationConfig> {
+    let generation_config = fs::read_to_string(file_path)?;
+    let generation_config = serde_json::from_str(&generation_config)?;
+    Ok(generation_config)
+}
+
+/// Loads all the required configuration files for loading a model from the Hugging Face Hub.
+///
+/// # Arguments
+///
+/// * `repo_id`: The Hugging Face Hub model repository id.
+/// * `params`:
+///
+/// # Returns
+///
+/// A `ModelInfo` struct containing all the information required to load the model.
+pub fn from_pretrained<I: AsRef<str>>(
+    repo_id: I,
     params: Option<FromPretrainedParameters>,
 ) -> Result<ModelInfo> {
     let params = params.unwrap_or_default();
@@ -69,7 +131,19 @@ pub fn from_pretrained<S: AsRef<str>>(
     let api = builder.build()?;
     let api = api.repo(repo);
 
-    let config_file_path = api.get("config.json")?;
+    // Get the model configuration from `config.json`
+    let config = match api.get(MODEL_CONFIG_FILE) {
+        Ok(model_config_file_path) => load_model_config(model_config_file_path).ok(),
+        Err(_) => None,
+    };
+
+    // Try to get the model generation config from `generation_config.json` file
+    let generation_config = match api.get(MODEL_GENERATION_CONFIG_FILE) {
+        Ok(generation_config_file_path) => load_generation_config(generation_config_file_path).ok(),
+        Err(_) => None,
+    };
+
+    // Get the model weights
     let (weights_file_path, from_pth) = {
         if let Ok(weights_file_path) = api.get("model.safetensors") {
             (weights_file_path, false)
@@ -80,7 +154,8 @@ pub fn from_pretrained<S: AsRef<str>>(
     };
 
     Ok(ModelInfo {
-        config_file_path,
+        config,
+        generation_config: None,
         weights_file_path,
         from_pth,
     })

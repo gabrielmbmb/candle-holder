@@ -5,6 +5,7 @@ use crate::{
         bert::{BertTokenizer, BertTokenizerBuilder},
         llama::tokenizer::{LlamaTokenizer, LlamaTokenizerBuilder},
     },
+    utils::{load_model_config, MODEL_CONFIG_FILE},
     FromPretrainedParameters,
 };
 use anyhow::{bail, Error, Result};
@@ -761,12 +762,8 @@ pub fn from_pretrained<I: AsRef<str>>(
     };
 
     // Used to determine the tokenizer class if the other methods fail
-    let model_config = match api.get("config.json") {
-        Ok(model_config_file_path) => {
-            let model_config = fs::read_to_string(model_config_file_path)?;
-            let model_config: serde_json::Value = serde_json::from_str(&model_config)?;
-            Some(model_config)
-        }
+    let model_config = match api.get(MODEL_CONFIG_FILE) {
+        Ok(model_config_file_path) => load_model_config(model_config_file_path).ok(),
         Err(_) => None,
     };
 

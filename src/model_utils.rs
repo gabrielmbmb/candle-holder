@@ -1,6 +1,6 @@
 use candle_core::{DType, Tensor, D};
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 
 pub fn repeat_kv(kv: Tensor, n_rep: usize) -> Result<Tensor> {
     if n_rep == 1 {
@@ -8,10 +8,7 @@ pub fn repeat_kv(kv: Tensor, n_rep: usize) -> Result<Tensor> {
     }
 
     let (b_sz, n_kv_heads, seq_len, head_dim) = kv.dims4()?;
-    Tensor::cat(&vec![kv; n_rep], 2)
-        .map_err(|e| Error::Msg(e.to_string()))?
-        .reshape((b_sz, n_kv_heads * n_rep, seq_len, head_dim))
-        .map_err(|e| Error::Msg(e.to_string()))
+    Ok(Tensor::cat(&vec![kv; n_rep], 2)?.reshape((b_sz, n_kv_heads * n_rep, seq_len, head_dim))?)
 }
 
 pub fn prepare_4d_causal_attention_mask(attention_mask: &Tensor, dtype: DType) -> Result<Tensor> {

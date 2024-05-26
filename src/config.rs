@@ -59,3 +59,76 @@ impl Default for PretrainedConfig {
         }
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+enum EarlyStopping {
+    Bool(bool),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+enum StopStrings {
+    Single(String),
+    Multiple(Vec<String>),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GenerationConfig {
+    /// The maximum number of tokens the sequence can have. Corresponds to the number of input
+    /// tokens + `max_new_tokens` that will be generated. The default is `20`.
+    #[serde(default)]
+    max_length: usize,
+    /// The maximun number of tokens to generate.
+    max_new_tokens: Option<usize>,
+    /// The minimun number of tokens the sequence to be generated should have. Corresponds to the
+    /// number of input tokens + `min_new_tokens` that will be generated.
+    min_length: Option<usize>,
+    /// Controls the stopping condition for beam-based methods. It accepts the following values:
+    ///
+    /// - `True`: generation stops as soon as there are `num_beams` complete candidates.
+    /// - `False`: an heuristic is applied to determine if it's very unlikely to find better
+    /// candidates and the generation should stop.
+    /// - `"never"`: beam search only stops when there cannot be better candidates.
+    early_stopping: Option<EarlyStopping>,
+    /// The maximum amount of time that computation should be allowed to run in seconds.
+    max_time: Option<f64>,
+    /// A string or a list of strings that should terminate the generation if the model outputs
+    /// them.
+    stop_strings: Option<StopStrings>,
+    /// Whether or not to use sampling. If `false`, then greedy decoding will be used. The default
+    /// is `false`.
+    #[serde(default)]
+    do_sample: bool,
+    /// Number of beams for beam search. `1` means no beam search. The default is `1`.
+    #[serde(default)]
+    num_beams: usize,
+    /// Number of groups to divide `num_beams`
+    #[serde(default)]
+    num_beam_groups: usize,
+    penalty_alpha: Option<f64>,
+    /// Whether the model should use the past key/values attentions to speed up decoding.
+    #[serde(default)]
+    use_cache: bool,
+    #[serde(default)]
+    temperature: f64,
+}
+
+impl Default for GenerationConfig {
+    fn default() -> Self {
+        Self {
+            max_length: 20,
+            max_new_tokens: None,
+            min_length: None,
+            early_stopping: None,
+            max_time: None,
+            stop_strings: None,
+            do_sample: false,
+            num_beams: 1,
+            num_beam_groups: 1,
+            penalty_alpha: None,
+            use_cache: true,
+            temperature: 1.0,
+        }
+    }
+}
