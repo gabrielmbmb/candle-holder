@@ -26,6 +26,7 @@ pub use models::roberta::RobertaTokenizer;
 // Pipelines
 pub use pipelines::fill_mask::FillMaskPipeline;
 pub use pipelines::text_classification::TextClassificationPipeline;
+pub use pipelines::text_generation::TextGenerationPipeline;
 pub use pipelines::token_classification::{
     AggregationStrategy, TokenClassificationOptions, TokenClassificationPipeline,
 };
