@@ -7,6 +7,8 @@ pub mod pipelines;
 pub mod tokenizer;
 pub mod utils;
 
+pub use error::Error;
+
 // Model factory structs
 pub use model::{
     AutoModel, AutoModelForCausalLM, AutoModelForMaskedLM, AutoModelForSequenceClassification,
@@ -33,3 +35,5 @@ pub use pipelines::token_classification::{
 pub use pipelines::zero_shot_classification::{
     ZeroShotClassificationOptions, ZeroShotClassificationPipeline,
 };
+
+pub type Result<T> = std::result::Result<T, Error>;

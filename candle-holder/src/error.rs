@@ -6,6 +6,23 @@ pub enum Error {
     #[error("Model weights not found in the repo.")]
     ModelWeightsNotFound,
 
+    // Load tokenizer errors
+    #[error("Tokenizer configuration is missing. Check the repository contains a `tokenizer_config.json` file.")]
+    TokenizerMissingConfig,
+
+    #[error("Tokenizer build error: {0}")]
+    TokenizerBuildError(String),
+
+    #[error("The tokenizer is missing the special token `{0}`")]
+    MissingSpecialToken(String),
+
+    #[error("The tokenizer is missing the id of the special token `{0}`")]
+    MissingSpecialTokenId(String),
+
+    // Tokenizer encoding errors
+    #[error("Tokenizer encoding error: {0}")]
+    TokenizerEncodingError(String),
+
     // `forward` method errors
     #[error("Forward param {0} cannot be `None`.")]
     MissingForwardParam(String),
@@ -21,6 +38,10 @@ pub enum Error {
 impl Error {
     pub fn wrap(e: impl std::error::Error + Send + Sync + 'static) -> Self {
         Error::Wrapped(Box::new(e))
+    }
+
+    pub fn msg<T: std::fmt::Display>(msg: T) -> Self {
+        Error::Msg(msg.to_string())
     }
 }
 
