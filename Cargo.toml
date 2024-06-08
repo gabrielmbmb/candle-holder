@@ -1,5 +1,5 @@
 [workspace]
-members = ["candle-holder", "candle-holder-tokenizers"]
+members = ["candle-holder", "candle-holder-models", "candle-holder-pipelines", "candle-holder-tokenizers"]
 resolver = "2"
 
 [workspace.package]

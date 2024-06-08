@@ -1,12 +1,13 @@
+use candle_core::{DType, Device, Tensor};
+use candle_holder::{bail, Error, FromPretrainedParameters, Result};
+use tokenizers::{
+    AddedToken, PaddingDirection, PaddingParams, PaddingStrategy, Tokenizer as CoreTokenizer,
+};
+
 use crate::tokenizers::bert::{BertTokenizer, BertTokenizerBuilder};
 use crate::{
     encoding::BatchEncoding,
-    from_pretrained::{from_pretrained, FromPretrainedParameters, TokenizerInfo},
-};
-use candle_core::{DType, Device, Tensor};
-use candle_holder::{bail, Error, Result};
-use tokenizers::{
-    AddedToken, PaddingDirection, PaddingParams, PaddingStrategy, Tokenizer as CoreTokenizer,
+    from_pretrained::{from_pretrained, TokenizerInfo},
 };
 
 /// An enum containing the available padding configurations for the tokenizer.
