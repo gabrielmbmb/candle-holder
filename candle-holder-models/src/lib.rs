@@ -4,10 +4,10 @@ pub mod model;
 pub mod models;
 pub mod utils;
 
-// Model factory structs
+pub use config::{PretrainedConfig, ProblemType};
 pub use model::{
     AutoModel, AutoModelForCausalLM, AutoModelForMaskedLM, AutoModelForSequenceClassification,
-    AutoModelForTokenClassification, PreTrainedModel,
+    AutoModelForTokenClassification, ForwardParams, PreTrainedModel,
 };
 
 // BERT

@@ -2,6 +2,7 @@ use candle_core::{Device, Tensor};
 use candle_holder::Result;
 use tokenizers::Encoding;
 
+/// A struct containing the encoding of several sequences.
 #[derive(Debug)]
 pub struct BatchEncoding {
     input_ids: Tensor,

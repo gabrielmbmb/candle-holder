@@ -7,7 +7,6 @@ use candle_holder::{
 use hf_hub::{api::sync::Api, Repo, RepoType};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Deserializer, Serialize};
-use serde_json::Value;
 use tokenizers::{
     models::bpe::{Merges, Vocab},
     AddedToken,

@@ -204,7 +204,7 @@ pub fn from_pretrained<I: AsRef<str>>(
 
     Ok(ModelInfo {
         config,
-        generation_config: None,
+        generation_config,
         weights_file_paths,
         from_pth,
     })

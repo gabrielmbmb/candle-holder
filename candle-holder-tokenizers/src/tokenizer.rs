@@ -5,6 +5,8 @@ use tokenizers::{
 };
 
 use crate::tokenizers::bert::{BertTokenizer, BertTokenizerBuilder};
+use crate::tokenizers::llama::{LlamaTokenizer, LlamaTokenizerBuilder};
+use crate::tokenizers::roberta::{RobertaTokenizer, RobertaTokenizerBuilder};
 use crate::{
     encoding::BatchEncoding,
     from_pretrained::{from_pretrained, TokenizerInfo},
@@ -378,11 +380,6 @@ macro_rules! impl_auto_tokenizer_from_pretrained_method {
     };
 }
 
-impl_auto_tokenizer_from_pretrained_method!(
-    AutoTokenizer,
-    ("BertTokenizer", BertTokenizer, BertTokenizerBuilder)
-);
-
 // Implement `from_pretrained` method for each tokenizer
 #[macro_export]
 macro_rules! impl_tokenizer_from_pretrained_method {
@@ -400,4 +397,22 @@ macro_rules! impl_tokenizer_from_pretrained_method {
     };
 }
 
+impl_auto_tokenizer_from_pretrained_method!(
+    AutoTokenizer,
+    ("BertTokenizer", BertTokenizer, BertTokenizerBuilder),
+    ("LlamaTokenizer", LlamaTokenizer, LlamaTokenizerBuilder),
+    (
+        "RobertaTokenizer",
+        RobertaTokenizer,
+        RobertaTokenizerBuilder
+    )
+);
+
+// BERT
 impl_tokenizer_from_pretrained_method!(BertTokenizer, BertTokenizerBuilder);
+
+// Llama
+impl_tokenizer_from_pretrained_method!(LlamaTokenizer, LlamaTokenizerBuilder);
+
+//RoBERTa
+impl_tokenizer_from_pretrained_method!(RobertaTokenizer, RobertaTokenizerBuilder);

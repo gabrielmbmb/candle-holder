@@ -4,13 +4,14 @@ pub mod from_pretrained;
 pub mod tokenizer;
 pub mod tokenizers;
 
-use crate::tokenizer::{AutoTokenizer, Padding, Tokenizer, TokenizerBuilder};
+pub use crate::encoding::BatchEncoding;
+pub use crate::tokenizer::{AutoTokenizer, Padding, Tokenizer, TokenizerBuilder};
 
 // BERT
-use crate::tokenizers::bert::BertTokenizer;
+pub use crate::tokenizers::bert::BertTokenizer;
 
 // Llama
-use crate::tokenizers::llama::LlamaTokenizer;
+pub use crate::tokenizers::llama::LlamaTokenizer;
 
 // RoBERTa
-use crate::tokenizers::roberta::RobertaTokenizer;
+pub use crate::tokenizers::roberta::RobertaTokenizer;
