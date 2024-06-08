@@ -1,5 +1,6 @@
 use hf_hub::api::sync::ApiError;
 
+// `candle-holder` main error type
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     // Load model errors
