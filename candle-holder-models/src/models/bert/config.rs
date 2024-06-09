@@ -34,6 +34,8 @@ pub struct BertConfig {
     #[serde(default)]
     pub position_embedding_type: PositionEmbeddingType,
     #[serde(default)]
+    pub is_decoder: bool,
+    #[serde(default)]
     pub use_cache: bool,
     pub classifier_dropout: Option<f32>,
     pub model_type: Option<String>,
@@ -59,6 +61,7 @@ impl Default for BertConfig {
             layer_norm_eps: 1e-12,
             pad_token_id: 0,
             position_embedding_type: PositionEmbeddingType::Absolute,
+            is_decoder: false,
             use_cache: true,
             classifier_dropout: None,
             model_type: Some("bert".to_string()),

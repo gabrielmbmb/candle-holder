@@ -10,6 +10,7 @@ use super::config::{BertConfig, HiddenAct};
 use crate::{
     config::PretrainedConfig,
     model::{ForwardParams, PreTrainedModel},
+    utils::attn_mask::get_extended_attention_mask,
 };
 
 pub const BERT_DTYPE: DType = DType::F32;
@@ -123,10 +124,12 @@ impl BertSelfAttention {
         let xs = xs.reshape(new_x_shape.as_slice())?.transpose(1, 2)?;
         xs.contiguous()
     }
-}
 
-impl Module for BertSelfAttention {
-    fn forward(&self, hidden_states: &Tensor) -> candle_core::Result<Tensor> {
+    fn forward(
+        &self,
+        hidden_states: &Tensor,
+        attention_mask: &Tensor,
+    ) -> candle_core::Result<Tensor> {
         let query_layer = self.query.forward(hidden_states)?;
         let key_layer = self.key.forward(hidden_states)?;
         let value_layer = self.value.forward(hidden_states)?;
@@ -137,6 +140,8 @@ impl Module for BertSelfAttention {
 
         let attention_scores = query_layer.matmul(&key_layer.t()?)?;
         let attention_scores = (attention_scores / (self.attention_head_size as f64).sqrt())?;
+        let attention_scores = attention_scores.broadcast_add(&attention_mask)?;
+
         let attention_probs = softmax(&attention_scores, candle_core::D::Minus1)?;
         let attention_probs = self.dropout.forward(&attention_probs, false)?;
 
@@ -194,11 +199,13 @@ impl BertAttention {
             self_output,
         })
     }
-}
 
-impl Module for BertAttention {
-    fn forward(&self, input_tensor: &Tensor) -> candle_core::Result<Tensor> {
-        let self_outputs = self.self_attention.forward(input_tensor)?;
+    fn forward(
+        &self,
+        input_tensor: &Tensor,
+        attention_mask: &Tensor,
+    ) -> candle_core::Result<Tensor> {
+        let self_outputs = self.self_attention.forward(input_tensor, attention_mask)?;
         let attention_output = self.self_output.forward(&self_outputs, input_tensor)?;
         Ok(attention_output)
     }
@@ -277,11 +284,13 @@ impl BertLayer {
             output,
         })
     }
-}
 
-impl Module for BertLayer {
-    fn forward(&self, hidden_states: &Tensor) -> candle_core::Result<Tensor> {
-        let attention_output = self.attention.forward(hidden_states)?;
+    fn forward(
+        &self,
+        hidden_states: &Tensor,
+        attention_mask: &Tensor,
+    ) -> candle_core::Result<Tensor> {
+        let attention_output = self.attention.forward(hidden_states, attention_mask)?;
         let intermediate_output = self.intermediate.forward(&attention_output)?;
         let layer_output = self
             .output
@@ -301,13 +310,15 @@ impl BertEncoder {
             .collect::<Result<Vec<_>>>()?;
         Ok(Self { layers })
     }
-}
 
-impl Module for BertEncoder {
-    fn forward(&self, hidden_states: &Tensor) -> candle_core::Result<Tensor> {
+    fn forward(
+        &self,
+        hidden_states: &Tensor,
+        attention_mask: &Tensor,
+    ) -> candle_core::Result<Tensor> {
         let mut hidden_states = hidden_states.clone();
         for layer in self.layers.iter() {
-            hidden_states = layer.forward(&hidden_states)?;
+            hidden_states = layer.forward(&hidden_states, attention_mask)?;
         }
         Ok(hidden_states)
     }
@@ -422,6 +433,7 @@ pub struct Bert {
     embeddings: BertEmbeddings,
     encoder: BertEncoder,
     pooler: Option<BertPooler>,
+    config: BertConfig,
 }
 
 impl Bert {
@@ -433,6 +445,7 @@ impl Bert {
             embeddings,
             encoder,
             pooler: Some(pooler),
+            config: config.clone(),
         })
     }
 
@@ -443,30 +456,39 @@ impl Bert {
             embeddings,
             encoder,
             pooler: None,
+            config: config.clone(),
         })
     }
 
     pub fn forward_return_sequence(
         &self,
         input_ids: &Tensor,
+        attention_mask: &Tensor,
         token_type_ids: &Tensor,
     ) -> Result<Tensor> {
+        let extended_attention_mask =
+            get_extended_attention_mask(attention_mask, BERT_DTYPE, self.config.is_decoder)?;
         let embedding_output = self.embeddings.forward(input_ids, token_type_ids)?;
-        let sequence_output = self.encoder.forward(&embedding_output)?;
+        let sequence_output = self
+            .encoder
+            .forward(&embedding_output, &extended_attention_mask)?;
         Ok(sequence_output)
     }
 
     pub fn forward(
         &self,
         input_ids: &Tensor,
+        attention_mask: &Tensor,
         token_type_ids: &Tensor,
     ) -> Result<(Tensor, Option<Tensor>)> {
-        let embedding_output = self.embeddings.forward(input_ids, token_type_ids)?;
-        let sequence_output = self.encoder.forward(&embedding_output)?;
+        let sequence_output =
+            self.forward_return_sequence(input_ids, attention_mask, token_type_ids)?;
+
         if let Some(pooler) = &self.pooler {
             let pooled_output = pooler.forward(&sequence_output)?;
             return Ok((sequence_output, Some(pooled_output)));
         }
+
         Ok((sequence_output, None))
     }
 }
@@ -489,12 +511,17 @@ impl PreTrainedModel for BertModel {
                 .get_input_ids()
                 .ok_or(Error::MissingForwardParam("input_ids".to_string()))?,
             params
+                .get_attention_mask()
+                .ok_or(Error::MissingForwardParam("attention_mask".to_string()))?,
+            params
                 .get_token_type_ids()
                 .ok_or(Error::MissingForwardParam("token_type_ids".to_string()))?,
         )?;
+
         if let Some(pooled_output) = pooled_output {
             return Ok(pooled_output);
         }
+
         Ok(sequence_output)
     }
 
@@ -534,6 +561,9 @@ impl PreTrainedModel for BertForSequenceClassification {
             params
                 .get_input_ids()
                 .ok_or(Error::MissingForwardParam("input_ids".to_string()))?,
+            params
+                .get_attention_mask()
+                .ok_or(Error::MissingForwardParam("attention_mask".to_string()))?,
             params
                 .get_token_type_ids()
                 .ok_or(Error::MissingForwardParam("token_type_ids".to_string()))?,
@@ -580,6 +610,9 @@ impl PreTrainedModel for BertForTokenClassification {
                 .get_input_ids()
                 .ok_or(Error::MissingForwardParam("input_ids".to_string()))?,
             params
+                .get_attention_mask()
+                .ok_or(Error::MissingForwardParam("attention_mask".to_string()))?,
+            params
                 .get_token_type_ids()
                 .ok_or(Error::MissingForwardParam("token_type_ids".to_string()))?,
         )?;
@@ -616,6 +649,9 @@ impl PreTrainedModel for BertForMaskedLM {
             params
                 .get_input_ids()
                 .ok_or(Error::MissingForwardParam("input_ids".to_string()))?,
+            params
+                .get_attention_mask()
+                .ok_or(Error::MissingForwardParam("attention_mask".to_string()))?,
             params
                 .get_token_type_ids()
                 .ok_or(Error::MissingForwardParam("token_type_ids".to_string()))?,

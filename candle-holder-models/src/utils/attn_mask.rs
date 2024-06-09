@@ -21,6 +21,27 @@ pub fn repeat_kv(kv: Tensor, n_rep: usize) -> Result<Tensor> {
     Ok(Tensor::cat(&vec![kv; n_rep], 2)?.reshape((b_sz, n_kv_heads * n_rep, seq_len, head_dim))?)
 }
 
+/// Creates a broadcastable attention mask to ignore future, padding and masked tokens.
+///
+/// # Arguments
+///
+/// * `attention_mask` - The attention mask tensor with shape `(batch_size, seq_len)`.
+/// * `is_decoder` - Whether the attention mask is for a decoder model or not.
+///
+/// # Returns
+///
+/// The broadcastable attention mask tensor with shape `(batch_size, 1, 1, seq_len)`.
+pub fn get_extended_attention_mask(attention_mask: &Tensor, _is_decoder: bool) -> Result<Tensor> {
+    let dtype = attention_mask.dtype()?;
+    let extended_attention_mask = attention_mask.unsqueeze(1)?.unsqueeze(2)?;
+    let on_true = extended_attention_mask.zeros_like()?.to_dtype(dtype)?;
+    let on_false = Tensor::new(f32::NEG_INFINITY, extended_attention_mask.device())?
+        .broadcast_as(extended_attention_mask.shape())?
+        .to_dtype(dtype)?;
+    let extended_attention_mask = extended_attention_mask.where_cond(&on_true, &on_false)?;
+    Ok(extended_attention_mask)
+}
+
 pub fn prepare_4d_causal_attention_mask(attention_mask: &Tensor, dtype: DType) -> Result<Tensor> {
     let (b_sz, seq_len) = attention_mask.dims2()?;
     let inverted_mask = attention_mask
