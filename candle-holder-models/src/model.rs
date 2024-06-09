@@ -64,6 +64,19 @@ impl<'a> Default for ForwardParams<'a> {
     }
 }
 
+#[cfg(feature = "tokenizers")]
+impl<'a> From<&'a candle_holder_tokenizers::BatchEncoding> for ForwardParams<'a> {
+    fn from(encodings: &'a candle_holder_tokenizers::BatchEncoding) -> Self {
+        Self::new(
+            Some(encodings.get_input_ids()),
+            Some(encodings.get_attention_mask()),
+            Some(encodings.get_token_type_ids()),
+            None,
+            None,
+        )
+    }
+}
+
 /// Trait for a pre-trained model.
 pub trait PreTrainedModel {
     fn load(vb: VarBuilder, config: serde_json::Value) -> Result<Self>
