@@ -396,8 +396,8 @@ pub fn load_special_tokens_map(file_path: std::path::PathBuf) -> Result<SpecialT
 ///
 /// # Arguments
 ///
-/// - `repo_id` - The ID of the repository to load the tokenizer from.
-/// - `params` - Optional parameters to specify the revision, user agent, and auth token.
+/// * `repo_id` - The ID of the repository to load the tokenizer from.
+/// * `params` - Optional parameters to specify the revision, user agent, and auth token.
 ///
 /// # Returns
 ///

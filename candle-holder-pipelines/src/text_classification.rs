@@ -6,6 +6,7 @@ use candle_holder_models::{
 use candle_holder_tokenizers::{AutoTokenizer, BatchEncoding, Padding, Tokenizer};
 use candle_nn::ops::{sigmoid, softmax};
 
+/// A pipeline for doing text classification.
 pub struct TextClassificationPipeline {
     model: Box<dyn PreTrainedModel>,
     tokenizer: Box<dyn Tokenizer>,
@@ -13,6 +14,17 @@ pub struct TextClassificationPipeline {
 }
 
 impl TextClassificationPipeline {
+    /// Creates a new `TextClassificationPipeline`.
+    ///
+    /// # Arguments
+    ///
+    /// * `identifier` - The repository id of the model to load.
+    /// * `device` - The device to run the model on.
+    /// * `params` - Optional parameters to specify the revision, user agent, and auth token.
+    ///
+    /// # Returns
+    ///
+    /// The `TextClassificationPipeline` instance.
     pub fn new<S: AsRef<str> + Copy>(
         identifier: S,
         device: &Device,
@@ -83,6 +95,18 @@ impl TextClassificationPipeline {
         }
         Ok(results)
     }
+
+    /// Classifies a single sequence.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - The input sequence to classify.
+    /// * `candidate_labels` - The candidate labels to classify the input against.
+    /// * `options` - Optional parameters for the pipeline..
+    ///
+    /// # Returns
+    ///
+    /// A list containing the predicted label and the confidence score.
     pub fn run<I: Into<String>>(
         &mut self,
         input: I,
@@ -92,6 +116,18 @@ impl TextClassificationPipeline {
         let output = self.model.forward(ForwardParams::from(&encodings))?;
         Ok(self.postprocess(output, top_k)?[0].clone())
     }
+
+    /// Classifies a list of sequences.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - The input sequence to classify.
+    /// * `candidate_labels` - The candidate labels to classify the input against.
+    /// * `options` - Optional parameters for the pipeline..
+    ///
+    /// # Returns
+    ///
+    /// A list containing the predicted label and the confidence score for each sequence.
     pub fn run_batch<I: Into<String>>(
         &mut self,
         inputs: Vec<I>,

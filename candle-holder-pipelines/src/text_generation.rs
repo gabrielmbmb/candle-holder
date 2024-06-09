@@ -3,6 +3,7 @@ use candle_holder::{FromPretrainedParameters, Result};
 use candle_holder_models::{AutoModelForCausalLM, PreTrainedModel};
 use candle_holder_tokenizers::{AutoTokenizer, BatchEncoding, Padding, Tokenizer};
 
+/// A pipeline for generating text with a causal language model.
 pub struct TextGenerationPipeline {
     model: Box<dyn PreTrainedModel>,
     tokenizer: Box<dyn Tokenizer>,
@@ -10,6 +11,17 @@ pub struct TextGenerationPipeline {
 }
 
 impl TextGenerationPipeline {
+    /// Creates a new `TextGenerationPipeline`.
+    ///
+    /// # Arguments
+    ///
+    /// * `identifier` - The repository id of the model to load.
+    /// * `device` - The device to run the model on.
+    /// * `params` - Optional parameters to specify the revision, user agent, and auth token.
+    ///
+    /// # Returns
+    ///
+    /// The `TextGenerationPipeline` instance.
     pub fn new<S: AsRef<str> + Copy>(
         identifier: S,
         device: &Device,

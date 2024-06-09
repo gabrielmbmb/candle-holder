@@ -1,8 +1,6 @@
 use candle_core::{Device, IndexOp, Tensor, D};
 use candle_holder::{Error, FromPretrainedParameters, Result};
-use candle_holder_models::{
-    AutoModelForTokenClassification, ForwardParams, PreTrainedModel,
-};
+use candle_holder_models::{AutoModelForTokenClassification, ForwardParams, PreTrainedModel};
 use candle_holder_tokenizers::{AutoTokenizer, BatchEncoding, Padding, Tokenizer};
 use std::collections::HashMap;
 use tokenizers::Encoding;
@@ -106,6 +104,7 @@ fn substring(s: &str, start: usize, end: usize) -> String {
         .collect()
 }
 
+/// A pipeline for token classification.
 pub struct TokenClassificationPipeline {
     model: Box<dyn PreTrainedModel>,
     tokenizer: Box<dyn Tokenizer>,
@@ -114,6 +113,17 @@ pub struct TokenClassificationPipeline {
 }
 
 impl TokenClassificationPipeline {
+    /// Creates a new `TokenClassificationPipeline`.
+    ///
+    /// # Arguments
+    ///
+    /// * `identifier` - The repository id of the model to load.
+    /// * `device` - The device to run the model on.
+    /// * `params` - Optional parameters to specify the revision, user agent, and auth token.
+    ///
+    /// # Returns
+    ///
+    /// The `TokenClassificationPipeline` instance.
     pub fn new<S: AsRef<str> + Copy>(
         identifier: S,
         device: &Device,
@@ -458,6 +468,16 @@ impl TokenClassificationPipeline {
         Ok(entities)
     }
 
+    /// Identifies the entities in a sentence.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - The input sentence.
+    /// * `options` - Optional parameters of the pipeline.
+    ///
+    /// # Returns
+    ///
+    /// The entities found in the sentence.
     pub fn run<I: Into<String>>(
         &mut self,
         input: I,
@@ -466,11 +486,7 @@ impl TokenClassificationPipeline {
         let options = options.unwrap_or_default();
         let inputs = vec![input.into()];
         let encodings = self.preprocess(inputs.clone())?;
-        let output = self.model.forward(ForwardParams {
-            input_ids: Some(encodings.get_input_ids()),
-            token_type_ids: Some(encodings.get_token_type_ids()),
-            ..Default::default()
-        })?;
+        let output = self.model.forward(ForwardParams::from(encodings))?;
         let entities = self
             .postprocess(
                 inputs,
@@ -486,6 +502,16 @@ impl TokenClassificationPipeline {
         Ok(entities)
     }
 
+    /// Identifies the entities in list of sentences.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - The input sentence.
+    /// * `options` - Optional parameters of the pipeline.
+    ///
+    /// # Returns
+    ///
+    /// The entities found in each sentence.
     pub fn run_batch<I: Into<String>>(
         &mut self,
         inputs: Vec<I>,
@@ -494,11 +520,7 @@ impl TokenClassificationPipeline {
         let options = options.unwrap_or_default();
         let inputs: Vec<String> = inputs.into_iter().map(|x| x.into()).collect();
         let encodings = self.preprocess(inputs.clone())?;
-        let output = self.model.forward(ForwardParams {
-            input_ids: Some(encodings.get_input_ids()),
-            token_type_ids: Some(encodings.get_token_type_ids()),
-            ..Default::default()
-        })?;
+        let output = self.model.forward(ForwardParams::from(encodings))?;
         self.postprocess(
             inputs,
             encodings.get_input_ids().to_vec2::<u32>()?,

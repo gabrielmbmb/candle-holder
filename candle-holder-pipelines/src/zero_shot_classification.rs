@@ -1,8 +1,6 @@
 use candle_core::{Device, IndexOp, Tensor, D};
 use candle_holder::{Error, FromPretrainedParameters, Result};
-use candle_holder_models::{
-    AutoModelForSequenceClassification, ForwardParams, PreTrainedModel,
-};
+use candle_holder_models::{AutoModelForSequenceClassification, ForwardParams, PreTrainedModel};
 use candle_holder_tokenizers::{AutoTokenizer, BatchEncoding, Padding, Tokenizer};
 use candle_nn::ops::softmax;
 use dyn_fmt::AsStrFormatExt;
@@ -23,6 +21,7 @@ impl Default for ZeroShotClassificationOptions {
     }
 }
 
+/// A pipeline for doing zero-shot classification.
 pub struct ZeroShotClassificationPipeline {
     model: Box<dyn PreTrainedModel>,
     tokenizer: Box<dyn Tokenizer>,
@@ -33,6 +32,17 @@ pub struct ZeroShotClassificationPipeline {
 }
 
 impl ZeroShotClassificationPipeline {
+    /// Creates a new `ZeroShotClassificationPipeline`.
+    ///
+    /// # Arguments
+    ///
+    /// * `identifier` - The repository id of the model to load.
+    /// * `device` - The device to run the model on.
+    /// * `params` - Optional parameters to specify the revision, user agent, and auth token.
+    ///
+    /// # Returns
+    ///
+    /// The `ZeroShotClassificationPipeline` instance.
     pub fn new<S: AsRef<str> + Copy>(
         identifier: S,
         device: &Device,
@@ -158,6 +168,17 @@ impl ZeroShotClassificationPipeline {
         Ok(sequence_pairs)
     }
 
+    /// Classifies a single sequence.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - The input sequence to classify.
+    /// * `candidate_labels` - The candidate labels to classify the input against.
+    /// * `options` - Optional parameters for the pipeline..
+    ///
+    /// # Returns
+    ///
+    /// A list containing the predicted label and the confidence score.
     pub fn run<I: Into<String>, L: AsRef<str>>(
         &mut self,
         input: I,
@@ -171,14 +192,21 @@ impl ZeroShotClassificationPipeline {
             .map(|label| label.as_ref().to_string())
             .collect();
         let encodings = self.preprocess(inputs, &candidate_labels, &options)?;
-        let output = self.model.forward(ForwardParams {
-            input_ids: Some(encodings.get_input_ids()),
-            token_type_ids: Some(encodings.get_token_type_ids()),
-            ..Default::default()
-        })?;
+        let output = self.model.forward(ForwardParams::from(encodings))?;
         Ok(self.postprocess(output, 1, &candidate_labels, options.multi_label)?[0].clone())
     }
 
+    /// Classifies a list of sequences.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - The input sequence to classify.
+    /// * `candidate_labels` - The candidate labels to classify the input against.
+    /// * `options` - Optional parameters for the pipeline..
+    ///
+    /// # Returns
+    ///
+    /// A list containing the predicted label and the confidence score for each sequence.
     pub fn run_batch<I: Into<String>, L: AsRef<str>>(
         &mut self,
         inputs: Vec<I>,
@@ -193,11 +221,7 @@ impl ZeroShotClassificationPipeline {
             .map(|label| label.as_ref().to_string())
             .collect();
         let encodings = self.preprocess(inputs, &candidate_labels, &options)?;
-        let output = self.model.forward(ForwardParams {
-            input_ids: Some(encodings.get_input_ids()),
-            token_type_ids: Some(encodings.get_token_type_ids()),
-            ..Default::default()
-        })?;
+        let output = self.model.forward(ForwardParams::from(encodings))?;
         self.postprocess(
             output,
             num_sequences,

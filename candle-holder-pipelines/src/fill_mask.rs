@@ -24,6 +24,17 @@ pub struct FillMaskPipeline {
 }
 
 impl FillMaskPipeline {
+    /// Creates a new `FillMaskPipeline`.
+    ///
+    /// # Arguments
+    ///
+    /// * `identifier` - The repository id of the model to load.
+    /// * `device` - The device to run the model on.
+    /// * `params` - Optional parameters to specify the revision, user agent, and auth token.
+    ///
+    /// # Returns
+    ///
+    /// The `FillMaskPipeline` instance.
     pub fn new<S: AsRef<str> + Copy>(
         identifier: S,
         device: &Device,
@@ -136,6 +147,16 @@ impl FillMaskPipeline {
         Ok(masked_index)
     }
 
+    /// Fills the masked tokens in a sentence.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - The input sentence with at least one mask token.
+    /// * `options` - Optional parameters of the pipeline.
+    ///
+    /// # Returns
+    ///
+    /// The top k predictions for each mask token in the sentence.
     pub fn run<I: Into<String>>(
         &mut self,
         input: I,
@@ -143,14 +164,20 @@ impl FillMaskPipeline {
     ) -> Result<Vec<Vec<FillMaskResult>>> {
         let options = options.unwrap_or_default();
         let (encodings, masked_index) = self.preprocess(vec![input.into()])?;
-        let output = self.model.forward(ForwardParams {
-            input_ids: Some(encodings.get_input_ids()),
-            token_type_ids: Some(encodings.get_token_type_ids()),
-            ..Default::default()
-        })?;
+        let output = self.model.forward(ForwardParams::from(encodings))?;
         Ok(self.postprocess(&output, encodings, masked_index, options.top_k)?[0].clone())
     }
 
+    /// Fills the masked tokens in a list of sentences.
+    ///
+    /// # Arguments
+    ///
+    /// * `inputs` - The list of input sentences with at least one mask token.
+    /// * `options` - Optional parameters of the pipeline.
+    ///
+    /// # Returns
+    ///
+    /// The top k predictions for each mask token in each sentence.
     pub fn run_batch<I: Into<String>>(
         &mut self,
         inputs: Vec<I>,
@@ -159,11 +186,7 @@ impl FillMaskPipeline {
         let options = options.unwrap_or_default();
         let inputs: Vec<String> = inputs.into_iter().map(|x| x.into()).collect();
         let (encodings, masked_index) = self.preprocess(inputs)?;
-        let output = self.model.forward(ForwardParams {
-            input_ids: Some(encodings.get_input_ids()),
-            token_type_ids: Some(encodings.get_token_type_ids()),
-            ..Default::default()
-        })?;
+        let output = self.model.forward(ForwardParams::from(encodings))?;
         self.postprocess(&output, encodings, masked_index, options.top_k)
     }
 }

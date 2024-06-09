@@ -94,6 +94,17 @@ pub trait PreTrainedModel {
 macro_rules! impl_from_pretrained_method {
     ($model_struct:ident, $dtype:expr) => {
         impl $model_struct {
+            /// Loads a model from the Hugging Face Hub.
+            ///
+            /// # Arguments
+            ///
+            /// * `identifier` - The repository id of the model to load.
+            /// * `device` - The device to run the model on.
+            /// * `params` - Optional parameters to specify the revision, user agent, and auth token.
+            ///
+            /// # Returns
+            ///
+            /// The loaded model.
             pub fn from_pretrained<S: AsRef<str>>(
                 repo_id: S,
                 device: &Device,
@@ -116,6 +127,17 @@ macro_rules! impl_from_pretrained_method {
 macro_rules! impl_auto_model_from_pretrained_method {
     ($auto_model_struct:ident, $(($model_type:expr, $model_struct:ident, $dtype:expr)), *) => {
         impl $auto_model_struct {
+            /// Loads a model from the Hugging Face Hub.
+            ///
+            /// # Arguments
+            ///
+            /// * `identifier` - The repository id of the model to load.
+            /// * `device` - The device to run the model on.
+            /// * `params` - Optional parameters to specify the revision, user agent, and auth token.
+            ///
+            /// # Returns
+            ///
+            /// The loaded model.
             pub fn from_pretrained<S: AsRef<str>>(
                 repo_id: S,
                 device: &Device,
