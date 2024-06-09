@@ -192,7 +192,7 @@ impl ZeroShotClassificationPipeline {
             .map(|label| label.as_ref().to_string())
             .collect();
         let encodings = self.preprocess(inputs, &candidate_labels, &options)?;
-        let output = self.model.forward(ForwardParams::from(encodings))?;
+        let output = self.model.forward(ForwardParams::from(&encodings))?;
         Ok(self.postprocess(output, 1, &candidate_labels, options.multi_label)?[0].clone())
     }
 
@@ -221,7 +221,7 @@ impl ZeroShotClassificationPipeline {
             .map(|label| label.as_ref().to_string())
             .collect();
         let encodings = self.preprocess(inputs, &candidate_labels, &options)?;
-        let output = self.model.forward(ForwardParams::from(encodings))?;
+        let output = self.model.forward(ForwardParams::from(&encodings))?;
         self.postprocess(
             output,
             num_sequences,

@@ -1,5 +1,11 @@
 [workspace]
-members = ["candle-holder", "candle-holder-models", "candle-holder-pipelines", "candle-holder-tokenizers"]
+members = [
+    "candle-holder",
+    "candle-holder-examples",
+    "candle-holder-models",
+    "candle-holder-pipelines",
+    "candle-holder-tokenizers",
+]
 resolver = "2"
 
 [workspace.package]
@@ -11,7 +17,6 @@ categories = ["science"]
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
-anyhow = "1.0.75"
 candle-core = "0.5.1"
 candle-nn = "0.5.1"
 candle-metal-kernels = "0.5.1"

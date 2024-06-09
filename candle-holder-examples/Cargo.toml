@@ -1,0 +1,24 @@
+[package]
+name = "candle-holder-examples"
+version.workspace = true
+edition.workspace = true
+description.workspace = true
+keywords.workspace = true
+categories.workspace = true
+license.workspace = true
+readme = "README.md"
+
+[dependencies]
+candle-holder = { path = "../candle-holder", version = "0.1.0" }
+candle-holder-models = { path = "../candle-holder-models", version = "0.1.0", features = [
+    "tokenizers",
+] }
+candle-holder-tokenizers = { path = "../candle-holder-tokenizers", version = "0.1.0" }
+candle-holder-pipelines = { path = "../candle-holder-pipelines", version = "0.1.0" }
+candle-core = { workspace = true }
+anyhow = "1.0.86"
+
+[features]
+metal = ["candle-core/metal", "candle-holder-models/metal"]
+cuda = ["candle-core/cuda", "candle-holder-models/cuda"]
+cudnn = ["candle-holder-models/cudnn"]

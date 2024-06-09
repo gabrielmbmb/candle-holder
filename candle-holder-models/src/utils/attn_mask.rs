@@ -26,13 +26,17 @@ pub fn repeat_kv(kv: Tensor, n_rep: usize) -> Result<Tensor> {
 /// # Arguments
 ///
 /// * `attention_mask` - The attention mask tensor with shape `(batch_size, seq_len)`.
+/// * `dtype` - The data type of the attention mask tensor to create.
 /// * `is_decoder` - Whether the attention mask is for a decoder model or not.
 ///
 /// # Returns
 ///
 /// The broadcastable attention mask tensor with shape `(batch_size, 1, 1, seq_len)`.
-pub fn get_extended_attention_mask(attention_mask: &Tensor, _is_decoder: bool) -> Result<Tensor> {
-    let dtype = attention_mask.dtype()?;
+pub fn get_extended_attention_mask(
+    attention_mask: &Tensor,
+    dtype: DType,
+    _is_decoder: bool,
+) -> Result<Tensor> {
     let extended_attention_mask = attention_mask.unsqueeze(1)?.unsqueeze(2)?;
     let on_true = extended_attention_mask.zeros_like()?.to_dtype(dtype)?;
     let on_false = Tensor::new(f32::NEG_INFINITY, extended_attention_mask.device())?

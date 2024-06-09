@@ -486,7 +486,7 @@ impl TokenClassificationPipeline {
         let options = options.unwrap_or_default();
         let inputs = vec![input.into()];
         let encodings = self.preprocess(inputs.clone())?;
-        let output = self.model.forward(ForwardParams::from(encodings))?;
+        let output = self.model.forward(ForwardParams::from(&encodings))?;
         let entities = self
             .postprocess(
                 inputs,
@@ -520,7 +520,7 @@ impl TokenClassificationPipeline {
         let options = options.unwrap_or_default();
         let inputs: Vec<String> = inputs.into_iter().map(|x| x.into()).collect();
         let encodings = self.preprocess(inputs.clone())?;
-        let output = self.model.forward(ForwardParams::from(encodings))?;
+        let output = self.model.forward(ForwardParams::from(&encodings))?;
         self.postprocess(
             inputs,
             encodings.get_input_ids().to_vec2::<u32>()?,

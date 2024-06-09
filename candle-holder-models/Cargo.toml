@@ -22,4 +22,6 @@ hf-hub = { workspace = true }
 [features]
 tokenizers = ["candle-holder-tokenizers"]
 metal = ["candle-core/metal", "candle-nn/metal", "candle-metal-kernels"]
+cuda = ["candle-core/cuda", "candle-nn/cuda"]
+cudnn = ["candle-core/cudnn"]
 flash-attn = ["candle-flash-attn"]
