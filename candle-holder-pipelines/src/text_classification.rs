@@ -89,11 +89,7 @@ impl TextClassificationPipeline {
         top_k: Option<usize>,
     ) -> Result<Vec<(String, f32)>> {
         let encodings = self.preprocess(vec![input.into()])?;
-        let output = self.model.forward(ForwardParams {
-            input_ids: Some(encodings.get_input_ids()),
-            token_type_ids: Some(encodings.get_token_type_ids()),
-            ..Default::default()
-        })?;
+        let output = self.model.forward(ForwardParams::from(&encodings))?;
         Ok(self.postprocess(output, top_k)?[0].clone())
     }
     pub fn run_batch<I: Into<String>>(
@@ -103,11 +99,7 @@ impl TextClassificationPipeline {
     ) -> Result<Vec<Vec<(String, f32)>>> {
         let inputs: Vec<String> = inputs.into_iter().map(|x| x.into()).collect();
         let encodings = self.preprocess(inputs)?;
-        let output = self.model.forward(ForwardParams {
-            input_ids: Some(encodings.get_input_ids()),
-            token_type_ids: Some(encodings.get_token_type_ids()),
-            ..Default::default()
-        })?;
+        let output = self.model.forward(ForwardParams::from(&encodings))?;
         self.postprocess(output, top_k)
     }
 }
