@@ -1,6 +1,5 @@
 use crate::Result;
-use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, path::PathBuf};
+use std::{collections::HashMap, fs};
 
 pub const MODEL_CONFIG_FILE: &str = "config.json";
 
