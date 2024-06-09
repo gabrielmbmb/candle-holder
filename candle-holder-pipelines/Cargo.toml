@@ -10,7 +10,9 @@ readme = "README.md"
 
 [dependencies]
 candle-holder = { path = "../candle-holder", version = "0.1.0" }
-candle-holder-models = { path = "../candle-holder-models", version = "0.1.0" }
+candle-holder-models = { path = "../candle-holder-models", version = "0.1.0", features = [
+    "tokenizers",
+] }
 candle-holder-tokenizers = { path = "../candle-holder-tokenizers", version = "0.1.0" }
 tokenizers = { workspace = true }
 candle-core = { workspace = true }
