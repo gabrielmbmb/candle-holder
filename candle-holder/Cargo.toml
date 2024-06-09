@@ -1,0 +1,15 @@
+[package]
+name = "candle-holder"
+version.workspace = true
+edition.workspace = true
+description.workspace = true
+keywords.workspace = true
+categories.workspace = true
+license.workspace = true
+readme = "README.md"
+
+[dependencies]
+candle-core = { workspace = true }
+hf-hub = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }

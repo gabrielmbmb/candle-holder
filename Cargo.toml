@@ -1,16 +1,26 @@
-[package]
-name = "candle-holder"
+[workspace]
+members = [
+    "candle-holder",
+    "candle-holder-examples",
+    "candle-holder-models",
+    "candle-holder-pipelines",
+    "candle-holder-tokenizers",
+]
+resolver = "2"
+
+[workspace.package]
 version = "0.1.0"
 edition = "2021"
+description = "transformers-like library for Rust using candle"
+keywords = ["nlp", "transformers", "rust", "candle"]
+categories = ["science"]
+license = "MIT OR Apache-2.0"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-anyhow = "1.0.75"
-candle-core = "0.5.0"
-candle-nn = "0.5.0"
-candle-metal-kernels = { version = "0.5.0", optional = true }
-candle-flash-attn = { version = "0.5.0", optional = true }
+[workspace.dependencies]
+candle-core = "0.5.1"
+candle-nn = "0.5.1"
+candle-metal-kernels = "0.5.1"
+candle-flash-attn = "0.5.1"
 dyn-fmt = "0.4.0"
 hf-hub = "0.3.2"
 lazy_static = "1.4.0"
@@ -18,7 +28,3 @@ serde = { version = "1.0.192", features = ["derive"] }
 serde_json = "1.0.108"
 tokenizers = { version = "0.19.1", features = ["http"] }
 thiserror = "1.0.61"
-
-[features]
-metal = ["candle-core/metal", "candle-nn/metal", "candle-metal-kernels"]
-flash-attn = ["candle-flash-attn"]
