@@ -337,7 +337,7 @@ impl BertPooler {
 
 impl Module for BertPooler {
     fn forward(&self, hidden_states: &Tensor) -> candle_core::Result<Tensor> {
-        let first_token_tensor = hidden_states.i((.., 0))?;
+        let first_token_tensor = hidden_states.i((.., 0))?.contiguous()?;
         let pooled_output = self.dense.forward(&first_token_tensor)?;
         pooled_output.tanh()
     }
