@@ -1,8 +1,30 @@
 use std::collections::HashMap;
 
 use candle_holder::{Error, Result};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use tokenizers::AddedToken;
+
+fn deserialize_model_max_length<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Option<usize>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+    match value {
+        serde_json::Value::Number(num) => {
+            if let Some(u) = num.as_u64() {
+                Ok(Some(u as usize))
+            } else {
+                Ok(Some(usize::MAX))
+            }
+        }
+        serde_json::Value::Null => Ok(None),
+        _ => Err(serde::de::Error::custom(
+            "Expected a number or null for usize",
+        )),
+    }
+}
 
 /// Tokenizer configuration
 #[derive(Debug, Serialize, Deserialize)]
@@ -17,6 +39,7 @@ pub struct TokenizerConfig {
     pub do_basic_tokenize: Option<bool>,
     pub do_lower_case: Option<bool>,
     pub mask_token: Option<String>,
+    #[serde(deserialize_with = "deserialize_model_max_length")]
     pub model_max_length: Option<usize>,
     pub never_split: Option<Vec<String>>,
     pub pad_token: Option<String>,
