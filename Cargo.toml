@@ -17,10 +17,10 @@ categories = ["science"]
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
-candle-core = "0.5.1"
-candle-nn = "0.5.1"
-candle-metal-kernels = "0.5.1"
-candle-flash-attn = "0.5.1"
+candle-core = { git = "https://github.com/huggingface/candle", package = "candle-core" }
+candle-nn = { git = "https://github.com/huggingface/candle", package = "candle-nn" }
+candle-metal-kernels = { git = "https://github.com/huggingface/candle", package = "candle-metal-kernels" }
+candle-flash-attn = { git = "https://github.com/huggingface/candle", package = "candle-flash-attn" }
 dyn-fmt = "0.4.0"
 hf-hub = "0.3.2"
 lazy_static = "1.4.0"

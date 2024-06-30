@@ -13,6 +13,7 @@ use crate::{
     model::PreTrainedModel,
     utils::attn_mask::{prepare_4d_causal_attention_mask, repeat_kv},
     utils::cache::DynamicCache,
+    utils::flash_attn::flash_attn,
 };
 
 use super::config::{HiddenAct, LlamaConfig};
@@ -139,22 +140,37 @@ impl LlamaAttention {
         let key_states = repeat_kv(key_states, self.num_key_value_groups)?;
         let value_states = repeat_kv(value_states, self.num_key_value_groups)?;
 
-        // Upcast to f32 for sensible operations (softmax)
-        let dtype = query_states.dtype();
-        let query_states = query_states.to_dtype(DType::F32)?;
-        let key_states = key_states.to_dtype(DType::F32)?;
-        let value_states = value_states.to_dtype(DType::F32)?;
+        let attn_output = if cfg!(feature = "flash-attn") {
+            let query_states = query_states.transpose(1, 2)?;
+            let key_states = key_states.transpose(1, 2)?;
+            let value_states = value_states.transpose(1, 2)?;
+            let softmax_scale = 1f32 / (self.head_dim as f32).sqrt();
+            flash_attn(
+                &query_states,
+                &key_states,
+                &value_states,
+                softmax_scale,
+                true,
+            )?
+        } else {
+            // Upcast to f32 for sensible operations (softmax)
+            let dtype = query_states.dtype();
+            let query_states = query_states.to_dtype(DType::F32)?;
+            let key_states = key_states.to_dtype(DType::F32)?;
+            let value_states = value_states.to_dtype(DType::F32)?;
 
-        let attn_weights =
-            (query_states.matmul(&key_states.t()?)? / (self.head_dim as f64).sqrt())?;
+            let attn_weights =
+                (query_states.matmul(&key_states.t()?)? / (self.head_dim as f64).sqrt())?;
 
-        // Apply causal attention mask
-        let attn_weights = attn_weights.broadcast_add(causal_mask)?;
+            // Apply causal attention mask
+            let attn_weights = attn_weights.broadcast_add(causal_mask)?;
 
-        let attn_weights = softmax_last_dim(&attn_weights)?;
-        let attn_weights = self.dropout.forward(&attn_weights, false)?;
+            let attn_weights = softmax_last_dim(&attn_weights)?;
+            let attn_weights = self.dropout.forward(&attn_weights, false)?;
 
-        let attn_output = attn_weights.matmul(&value_states)?.to_dtype(dtype)?;
+            attn_weights.matmul(&value_states)?.to_dtype(dtype)?
+        };
+
         let attn_output = attn_output
             .transpose(1, 2)?
             .reshape((b_sz, seq_len, hidden_size))?;
@@ -163,6 +179,7 @@ impl LlamaAttention {
         Ok(attn_output)
     }
 }
+
 pub struct HiddenActLayer {
     act: HiddenAct,
 }

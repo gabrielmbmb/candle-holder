@@ -22,3 +22,4 @@ anyhow = "1.0.86"
 metal = ["candle-core/metal", "candle-holder-models/metal"]
 cuda = ["candle-core/cuda", "candle-holder-models/cuda"]
 cudnn = ["candle-holder-models/cudnn"]
+flash-attn = ["candle-holder-models/flash-attn"]
