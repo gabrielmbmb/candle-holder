@@ -134,7 +134,7 @@ impl LlamaAttention {
 
         if let Some(cache) = cache {
             (key_states, value_states) =
-                cache.update_key_states(key_states, value_states, layer_idx)?;
+                cache.update_key_value_states(key_states, value_states, layer_idx)?;
         }
 
         let key_states = repeat_kv(key_states, self.num_key_value_groups)?;
@@ -152,6 +152,7 @@ impl LlamaAttention {
                 softmax_scale,
                 true,
             )?
+            .transpose(1, 2)?
         } else {
             // Upcast to f32 for sensible operations (softmax)
             let dtype = query_states.dtype();
@@ -342,8 +343,17 @@ impl Llama {
         let position_ids = match params.get_position_ids().cloned() {
             Some(position_ids) => position_ids,
             None => {
-                let seq_len = input_ids.dims2()?.1 as u8;
-                Tensor::arange(0u8, seq_len, input_ids.device())?.unsqueeze(0)?
+                let past_seen_tokens = match params.get_cache() {
+                    Some(cache) => cache.get_seq_length(None)?,
+                    None => 0,
+                };
+                let seq_len = input_ids.dims2()?.1 as u32;
+                Tensor::arange(
+                    past_seen_tokens,
+                    past_seen_tokens + seq_len,
+                    input_ids.device(),
+                )?
+                .unsqueeze(0)?
             }
         };
 
