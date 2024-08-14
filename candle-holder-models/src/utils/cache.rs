@@ -29,7 +29,7 @@ impl DynamicCache {
     /// # Returns
     ///
     /// The updated key and value states of the layer.
-    pub fn update_key_states(
+    pub fn update_key_value_states(
         &mut self,
         key_states: Tensor,
         value_states: Tensor,
@@ -40,14 +40,33 @@ impl DynamicCache {
             self.value_states.push(value_states);
         } else {
             self.key_states[layer_idx] =
-                Tensor::cat(&[&self.key_states[layer_idx], &key_states], D::Minus2)?;
+                Tensor::cat(&[&self.key_states[layer_idx], &key_states], 2)?;
             self.value_states[layer_idx] =
-                Tensor::cat(&[&self.value_states[layer_idx], &key_states], D::Minus2)?;
+                Tensor::cat(&[&self.value_states[layer_idx], &value_states], 2)?;
         }
 
         Ok((
             self.key_states[layer_idx].clone(),
             self.value_states[layer_idx].clone(),
         ))
+    }
+
+    /// Gets the sequence length of the cached states.
+    ///
+    /// # Arguments
+    ///
+    /// * `layer_idx` - The index of the layer. If not provided, the first layer is used.
+    ///
+    /// # Returns
+    ///
+    /// The sequence length of the cached states.
+    pub fn get_seq_length(&self, layer_idx: Option<usize>) -> Result<u32> {
+        let idx = layer_idx.unwrap_or(0);
+
+        if self.key_states.len() <= idx {
+            return Ok(0);
+        }
+
+        Ok(self.key_states[idx].dims4()?.2 as u32)
     }
 }
