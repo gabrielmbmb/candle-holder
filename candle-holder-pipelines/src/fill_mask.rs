@@ -1,7 +1,7 @@
 use candle_core::{DType, Device, Tensor, D};
 use candle_holder::{Error, FromPretrainedParameters, Result};
 use candle_holder_models::{AutoModelForMaskedLM, ForwardParams, PreTrainedModel};
-use candle_holder_tokenizers::{AutoTokenizer, BatchEncoding, Padding, Tokenizer};
+use candle_holder_tokenizers::{AutoTokenizer, BatchEncoding, Padding, PaddingOptions, Tokenizer};
 use candle_nn::ops::softmax;
 
 pub type FillMaskResult = (f32, u32, String, String);
@@ -66,9 +66,11 @@ impl FillMaskPipeline {
     }
 
     fn preprocess(&self, inputs: Vec<String>) -> Result<(BatchEncoding, Vec<Vec<u32>>)> {
-        let mut encodings = self
-            .tokenizer
-            .encode(inputs, true, Some(Padding::Longest))?;
+        let mut encodings = self.tokenizer.encode(
+            inputs,
+            true,
+            Some(PaddingOptions::new(Padding::Longest, None)),
+        )?;
         encodings.to_device(&self.device)?;
         let masked_index = self.get_masked_index(encodings.get_input_ids())?;
         self.ensure_at_least_one_mask_token(&masked_index)?;

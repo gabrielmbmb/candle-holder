@@ -2,13 +2,13 @@ use candle_holder::{Error, Result};
 use tokenizers::{
     models::bpe::{Merges, Vocab, BPE},
     processors::{byte_level::ByteLevel, roberta::RobertaProcessing},
-    NormalizerWrapper, PaddingDirection, Tokenizer as CoreTokenizer, TokenizerImpl,
+    NormalizerWrapper, Tokenizer as CoreTokenizer, TokenizerImpl,
 };
 
 use crate::{
     from_pretrained::TokenizerInfo,
     impl_tokenizer,
-    tokenizer::{Tokenizer, TokenizerBuilder},
+    tokenizer::{PaddingSide, Tokenizer, TokenizerBuilder},
 };
 
 const ROBERTA_MAX_LENGTH: usize = 512;
@@ -24,7 +24,7 @@ const ROBERTA_UNK_TOKEN: &str = "<unk>";
 #[derive(Debug)]
 pub struct RobertaTokenizer {
     tokenizer: CoreTokenizer,
-    padding_side: PaddingDirection,
+    padding_side: PaddingSide,
     max_length: usize,
     bos_token: Option<String>,
     cls_token: Option<String>,
@@ -40,7 +40,7 @@ impl_tokenizer!(RobertaTokenizer);
 /// `RobertaTokenizer` builder
 pub struct RobertaTokenizerBuilder {
     tokenizer_info: TokenizerInfo,
-    padding_side: Option<PaddingDirection>,
+    padding_side: Option<PaddingSide>,
 }
 
 impl RobertaTokenizerBuilder {
@@ -71,7 +71,7 @@ impl RobertaTokenizerBuilder {
 }
 
 impl TokenizerBuilder<RobertaTokenizer> for RobertaTokenizerBuilder {
-    fn new(tokenizer_info: TokenizerInfo, padding_side: Option<PaddingDirection>) -> Self {
+    fn new(tokenizer_info: TokenizerInfo, padding_side: Option<PaddingSide>) -> Self {
         RobertaTokenizerBuilder {
             tokenizer_info,
             padding_side,
@@ -160,7 +160,7 @@ impl TokenizerBuilder<RobertaTokenizer> for RobertaTokenizerBuilder {
 
         Ok(RobertaTokenizer {
             tokenizer,
-            padding_side: self.padding_side.unwrap_or(PaddingDirection::Right),
+            padding_side: self.padding_side.clone().unwrap_or(PaddingSide::Right),
             max_length,
             bos_token: Some(bos_token),
             cls_token: Some(cls_token),

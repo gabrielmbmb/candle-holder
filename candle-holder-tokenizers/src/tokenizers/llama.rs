@@ -1,10 +1,11 @@
+use candle_holder::{Error, Result};
+use tokenizers::Tokenizer as CoreTokenizer;
+
 use crate::{
     from_pretrained::TokenizerInfo,
     impl_tokenizer,
-    tokenizer::{Tokenizer, TokenizerBuilder},
+    tokenizer::{PaddingSide, Tokenizer, TokenizerBuilder},
 };
-use candle_holder::{Error, Result};
-use tokenizers::{PaddingDirection, Tokenizer as CoreTokenizer};
 
 const LLAMA_MAX_LENGTH: usize = 4096;
 const LLAMA_BOS_TOKEN: &str = "<s>";
@@ -14,7 +15,7 @@ const LLAMA_EOS_TOKEN: &str = "</s>";
 #[derive(Debug)]
 pub struct LlamaTokenizer {
     tokenizer: CoreTokenizer,
-    padding_side: PaddingDirection,
+    padding_side: PaddingSide,
     max_length: usize,
     bos_token: Option<String>,
     cls_token: Option<String>,
@@ -30,13 +31,13 @@ impl_tokenizer!(LlamaTokenizer);
 /// `LlamaTokenizer` builder
 pub struct LlamaTokenizerBuilder {
     tokenizer_info: TokenizerInfo,
-    padding_side: Option<PaddingDirection>,
+    padding_side: Option<PaddingSide>,
 }
 
 impl LlamaTokenizerBuilder {}
 
 impl TokenizerBuilder<LlamaTokenizer> for LlamaTokenizerBuilder {
-    fn new(tokenizer_info: TokenizerInfo, padding_side: Option<PaddingDirection>) -> Self {
+    fn new(tokenizer_info: TokenizerInfo, padding_side: Option<PaddingSide>) -> Self {
         LlamaTokenizerBuilder {
             tokenizer_info,
             padding_side,
@@ -71,7 +72,7 @@ impl TokenizerBuilder<LlamaTokenizer> for LlamaTokenizerBuilder {
 
         Ok(LlamaTokenizer {
             tokenizer,
-            padding_side: self.padding_side.unwrap_or(PaddingDirection::Right),
+            padding_side: self.padding_side.clone().unwrap_or(PaddingSide::Right),
             max_length,
             bos_token: Some(bos_token),
             cls_token: None,

@@ -1,7 +1,7 @@
 use candle_core::{DType, Device, IndexOp, Tensor, D};
 use candle_holder::{Error, FromPretrainedParameters, Result};
 use candle_holder_models::{AutoModelForSequenceClassification, ForwardParams, PreTrainedModel};
-use candle_holder_tokenizers::{AutoTokenizer, BatchEncoding, Padding, Tokenizer};
+use candle_holder_tokenizers::{AutoTokenizer, BatchEncoding, Padding, PaddingOptions, Tokenizer};
 use candle_nn::ops::softmax;
 use dyn_fmt::AsStrFormatExt;
 
@@ -90,9 +90,11 @@ impl ZeroShotClassificationPipeline {
             candidate_labels,
             &options.hypothesis_template,
         )?;
-        let mut encodings =
-            self.tokenizer
-                .encode_sequence_pairs(sequence_pairs, true, Some(Padding::Longest))?;
+        let mut encodings = self.tokenizer.encode_sequence_pairs(
+            sequence_pairs,
+            true,
+            Some(PaddingOptions::new(Padding::Longest, None)),
+        )?;
         encodings.to_device(&self.device)?;
         Ok(encodings)
     }

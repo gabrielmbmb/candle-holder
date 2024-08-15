@@ -23,13 +23,63 @@ pub enum Padding {
     Fixed(usize),
 }
 
+/// An enum containing the available sides in which a tokenizer can add the padding.
+#[derive(Debug, Clone)]
+pub enum PaddingSide {
+    /// Add the padding tokens to the left.
+    Left,
+    /// Add the padding tokens to the right.
+    Right,
+}
+
+impl Into<PaddingDirection> for PaddingSide {
+    fn into(self) -> PaddingDirection {
+        match self {
+            PaddingSide::Left => PaddingDirection::Left,
+            PaddingSide::Right => PaddingDirection::Right,
+        }
+    }
+}
+
+/// An struct containing the `Tokenizer` padding options.
+#[derive(Debug, Clone)]
+pub struct PaddingOptions {
+    /// The kind of padding to be done.
+    padding: Padding,
+    /// The side where the padding tokens should be added.
+    side: Option<PaddingSide>,
+}
+
+impl PaddingOptions {
+    pub fn new(padding: Padding, side: Option<PaddingSide>) -> Self {
+        Self { padding, side }
+    }
+
+    pub fn get_padding(&self) -> &Padding {
+        &self.padding
+    }
+
+    pub fn get_padding_side(&self) -> Option<&PaddingSide> {
+        self.side.as_ref()
+    }
+}
+
+impl Default for PaddingOptions {
+    fn default() -> Self {
+        Self {
+            padding: Padding::Longest,
+            side: Some(PaddingSide::Right),
+        }
+    }
+}
+
 /// A thin wrapper around `tokenizers::Tokenizer` that provides additional functionality
 /// for encoding and decoding sequences and to automatically load the tokenizer from a Hugging Face
 /// Hub repository.
 pub trait Tokenizer: std::fmt::Debug {
     fn get_tokenizer(&self) -> &CoreTokenizer;
 
-    fn get_tokenizer_with_padding(&self, padding: Padding) -> Result<CoreTokenizer> {
+    fn get_tokenizer_with_padding(&self, padding: PaddingOptions) -> Result<CoreTokenizer> {
         let pad_token = self
             .get_pad_token()
             .ok_or_else(|| Error::MissingSpecialToken("pad_token".to_string()))?
@@ -39,19 +89,22 @@ pub trait Tokenizer: std::fmt::Debug {
             .get_pad_token_id()
             .ok_or_else(|| Error::MissingSpecialTokenId("pad_token".to_string()))?;
 
-        let direction = self.get_padding_side();
-
-        let strategy = match padding {
+        let strategy = match padding.get_padding() {
             Padding::Longest => PaddingStrategy::BatchLongest,
             Padding::MaxLength => PaddingStrategy::Fixed(self.get_max_length()),
-            Padding::Fixed(length) => PaddingStrategy::Fixed(length),
+            Padding::Fixed(length) => PaddingStrategy::Fixed(length.clone()),
         };
+
+        let padding_side = padding
+            .get_padding_side()
+            .unwrap_or_else(|| self.get_padding_side())
+            .clone();
 
         let mut tokenizer = self.get_tokenizer().clone();
 
         tokenizer.with_padding(Some(PaddingParams {
             strategy,
-            direction,
+            direction: padding_side.into(),
             pad_to_multiple_of: None,
             pad_id,
             pad_type_id: 0,
@@ -61,7 +114,7 @@ pub trait Tokenizer: std::fmt::Debug {
         Ok(tokenizer)
     }
 
-    fn get_padding_side(&self) -> PaddingDirection;
+    fn get_padding_side(&self) -> &PaddingSide;
     fn get_max_length(&self) -> usize;
     fn get_bos_token(&self) -> Option<&str>;
     fn get_cls_token(&self) -> Option<&str>;
@@ -134,7 +187,7 @@ pub trait Tokenizer: std::fmt::Debug {
         &self,
         inputs: Vec<String>,
         add_special_tokens: bool,
-        padding: Option<Padding>,
+        padding: Option<PaddingOptions>,
     ) -> Result<BatchEncoding> {
         let tokenizer = match padding {
             Some(padding) => self.get_tokenizer_with_padding(padding)?,
@@ -182,7 +235,7 @@ pub trait Tokenizer: std::fmt::Debug {
         &self,
         sequence_pairs: Vec<(String, String)>,
         add_special_tokens: bool,
-        padding: Option<Padding>,
+        padding: Option<PaddingOptions>,
     ) -> Result<BatchEncoding> {
         let tokenizer = match padding {
             Some(padding) => self.get_tokenizer_with_padding(padding)?,
@@ -232,8 +285,8 @@ macro_rules! impl_tokenizer {
                 &self.tokenizer
             }
 
-            fn get_padding_side(&self) -> PaddingDirection {
-                self.padding_side
+            fn get_padding_side(&self) -> &PaddingSide {
+                &self.padding_side
             }
 
             fn get_max_length(&self) -> usize {
@@ -273,7 +326,7 @@ macro_rules! impl_tokenizer {
 
 /// A trait that defines the methods required to build a `Tokenizer`.
 pub trait TokenizerBuilder<T: Tokenizer> {
-    fn new(tokenizer_info: TokenizerInfo, padding_side: Option<PaddingDirection>) -> Self;
+    fn new(tokenizer_info: TokenizerInfo, padding_side: Option<PaddingSide>) -> Self;
     fn get_tokenizer_info(&self) -> &TokenizerInfo;
 
     fn build_tokenizer(&mut self) -> Result<CoreTokenizer> {
@@ -353,7 +406,7 @@ macro_rules! impl_auto_tokenizer_from_pretrained_method {
         impl $auto_tokenizer_struct {
             pub fn from_pretrained<S: AsRef<str>>(
                 repo_id: S,
-                padding_side: Option<PaddingDirection>,
+                padding_side: Option<PaddingSide>,
                 params: Option<FromPretrainedParameters>
             ) -> Result<Box<dyn Tokenizer>> {
                 let tokenizer_info = from_pretrained(repo_id, params)?;
@@ -382,7 +435,7 @@ macro_rules! impl_tokenizer_from_pretrained_method {
         impl $tokenizer_struct {
             pub fn from_pretrained<S: AsRef<str>>(
                 repo_id: S,
-                padding_side: Option<PaddingDirection>,
+                padding_side: Option<PaddingSide>,
                 params: Option<FromPretrainedParameters>,
             ) -> Result<Box<dyn Tokenizer>> {
                 let tokenizer_info = from_pretrained(repo_id, params)?;

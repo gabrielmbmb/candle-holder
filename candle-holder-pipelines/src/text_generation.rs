@@ -1,8 +1,9 @@
 use candle_core::{DType, Device};
 use candle_holder::{FromPretrainedParameters, Result};
 use candle_holder_models::{AutoModelForCausalLM, PreTrainedModel};
-use candle_holder_tokenizers::{AutoTokenizer, BatchEncoding, Padding, Tokenizer};
-use tokenizers::PaddingDirection;
+use candle_holder_tokenizers::{
+    AutoTokenizer, BatchEncoding, Padding, PaddingOptions, PaddingSide, Tokenizer,
+};
 
 /// A pipeline for generating text with a causal language model.
 pub struct TextGenerationPipeline {
@@ -32,7 +33,7 @@ impl TextGenerationPipeline {
         let model =
             AutoModelForCausalLM::from_pretrained(identifier, device, dtype, params.clone())?;
         let tokenizer =
-            AutoTokenizer::from_pretrained(identifier, Some(PaddingDirection::Left), params)?;
+            AutoTokenizer::from_pretrained(identifier, Some(PaddingSide::Left), params)?;
         Ok(Self {
             model,
             tokenizer,
@@ -41,9 +42,11 @@ impl TextGenerationPipeline {
     }
 
     fn preprocess(&self, inputs: Vec<String>) -> Result<BatchEncoding> {
-        let mut encodings = self
-            .tokenizer
-            .encode(inputs, true, Some(Padding::Longest))?;
+        let mut encodings = self.tokenizer.encode(
+            inputs,
+            true,
+            Some(PaddingOptions::new(Padding::Longest, None)),
+        )?;
         encodings.to_device(&self.device)?;
         Ok(encodings)
     }

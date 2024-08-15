@@ -4,13 +4,13 @@ use tokenizers::models::wordpiece::WordPiece;
 use tokenizers::normalizers::BertNormalizer;
 use tokenizers::{
     decoders::wordpiece::WordPiece as WordPieceDecoder, pre_tokenizers::bert::BertPreTokenizer,
-    processors::template::TemplateProcessing, PaddingDirection, Tokenizer as CoreTokenizer,
-    TokenizerImpl,
+    processors::template::TemplateProcessing, Tokenizer as CoreTokenizer, TokenizerImpl,
 };
 
 use crate::config::TokenizerConfig;
 use crate::from_pretrained::TokenizerInfo;
 use crate::impl_tokenizer;
+use crate::tokenizer::PaddingSide;
 use crate::tokenizer::{Tokenizer, TokenizerBuilder};
 
 const BERT_MAX_LENGTH: usize = 512;
@@ -24,7 +24,7 @@ const BERT_UNK_TOKEN: &str = "[UNK]";
 #[derive(Debug)]
 pub struct BertTokenizer {
     tokenizer: CoreTokenizer,
-    padding_side: PaddingDirection,
+    padding_side: PaddingSide,
     max_length: usize,
     bos_token: Option<String>,
     cls_token: Option<String>,
@@ -40,7 +40,7 @@ impl_tokenizer!(BertTokenizer);
 /// `BerTokenizer` builder.
 pub struct BertTokenizerBuilder {
     tokenizer_info: TokenizerInfo,
-    padding_side: Option<PaddingDirection>,
+    padding_side: Option<PaddingSide>,
 }
 
 impl BertTokenizerBuilder {
@@ -91,7 +91,7 @@ impl BertTokenizerBuilder {
 }
 
 impl TokenizerBuilder<BertTokenizer> for BertTokenizerBuilder {
-    fn new(tokenizer_info: TokenizerInfo, padding_side: Option<PaddingDirection>) -> Self {
+    fn new(tokenizer_info: TokenizerInfo, padding_side: Option<PaddingSide>) -> Self {
         BertTokenizerBuilder {
             tokenizer_info,
             padding_side,
@@ -179,7 +179,7 @@ impl TokenizerBuilder<BertTokenizer> for BertTokenizerBuilder {
 
         Ok(BertTokenizer {
             tokenizer,
-            padding_side: self.padding_side.unwrap_or(PaddingDirection::Right),
+            padding_side: self.padding_side.clone().unwrap_or(PaddingSide::Right),
             max_length,
             bos_token: None,
             cls_token: Some(cls_token),

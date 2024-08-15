@@ -5,7 +5,9 @@ pub mod tokenizer;
 pub mod tokenizers;
 
 pub use crate::encoding::BatchEncoding;
-pub use crate::tokenizer::{AutoTokenizer, Padding, Tokenizer, TokenizerBuilder};
+pub use crate::tokenizer::{
+    AutoTokenizer, Padding, PaddingOptions, PaddingSide, Tokenizer, TokenizerBuilder,
+};
 
 // BERT
 pub use crate::tokenizers::bert::BertTokenizer;

@@ -1,7 +1,7 @@
 use candle_core::{DType, Device, IndexOp, Tensor, D};
 use candle_holder::{Error, FromPretrainedParameters, Result};
 use candle_holder_models::{AutoModelForTokenClassification, ForwardParams, PreTrainedModel};
-use candle_holder_tokenizers::{AutoTokenizer, BatchEncoding, Padding, Tokenizer};
+use candle_holder_tokenizers::{AutoTokenizer, BatchEncoding, Padding, PaddingOptions, Tokenizer};
 use std::collections::HashMap;
 use tokenizers::Encoding;
 
@@ -151,9 +151,11 @@ impl TokenClassificationPipeline {
     }
 
     fn preprocess(&self, inputs: Vec<String>) -> Result<BatchEncoding> {
-        let mut encodings = self
-            .tokenizer
-            .encode(inputs, true, Some(Padding::Longest))?;
+        let mut encodings = self.tokenizer.encode(
+            inputs,
+            true,
+            Some(PaddingOptions::new(Padding::Longest, None)),
+        )?;
         encodings.to_device(&self.device)?;
         Ok(encodings)
     }

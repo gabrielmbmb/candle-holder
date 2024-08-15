@@ -3,7 +3,7 @@ use candle_holder::{Error, FromPretrainedParameters, Result};
 use candle_holder_models::{
     AutoModelForSequenceClassification, ForwardParams, PreTrainedModel, ProblemType,
 };
-use candle_holder_tokenizers::{AutoTokenizer, BatchEncoding, Padding, Tokenizer};
+use candle_holder_tokenizers::{AutoTokenizer, BatchEncoding, Padding, PaddingOptions, Tokenizer};
 use candle_nn::ops::{sigmoid, softmax};
 
 /// A pipeline for doing text classification.
@@ -46,9 +46,11 @@ impl TextClassificationPipeline {
     }
 
     fn preprocess(&self, inputs: Vec<String>) -> Result<BatchEncoding> {
-        let mut encodings = self
-            .tokenizer
-            .encode(inputs, true, Some(Padding::Longest))?;
+        let mut encodings = self.tokenizer.encode(
+            inputs,
+            true,
+            Some(PaddingOptions::new(Padding::Longest, None)),
+        )?;
         encodings.to_device(&self.device)?;
         Ok(encodings)
     }
