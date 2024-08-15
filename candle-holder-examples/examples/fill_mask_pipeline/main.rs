@@ -7,7 +7,7 @@ fn main() -> Result<()> {
     let device = get_device_from_args()?;
     println!("Device: {:?}", device);
 
-    let mut pipeline = FillMaskPipeline::new("gabrielmbmb/bert-test", &device, None)?;
+    let pipeline = FillMaskPipeline::new("gabrielmbmb/bert-test", &device, None, None)?;
 
     let results = pipeline.run("Paris is the [MASK] of France", None)?;
     println!("`pipeline.run` results: {:?}", results);

@@ -7,9 +7,10 @@ fn main() -> Result<()> {
     let device = get_device_from_args()?;
     println!("Device: {:?}", device);
 
-    let mut pipeline = ZeroShotClassificationPipeline::new(
+    let pipeline = ZeroShotClassificationPipeline::new(
         "Recognai/bert-base-spanish-wwm-cased-xnli",
         &device,
+        None,
         None,
     )?;
 

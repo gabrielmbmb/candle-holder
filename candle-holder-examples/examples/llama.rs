@@ -1,63 +1,60 @@
 use anyhow::{Error, Result};
-use candle_core::{Device, IndexOp, Tensor};
+use candle_core::{IndexOp, Tensor};
 use candle_holder_examples::get_device_from_args;
 use candle_holder_models::{
-    model::ForwardParams, utils::cache::DynamicCache, AutoModelForCausalLM, LlamaForCausalLM,
-    PreTrainedModel,
+    model::ForwardParams, utils::cache::DynamicCache, LlamaForCausalLM, PreTrainedModel,
 };
-use candle_holder_tokenizers::{BatchEncoding, LlamaTokenizer};
+use candle_holder_tokenizers::LlamaTokenizer;
 
 fn main() -> Result<()> {
     let device = get_device_from_args()?;
     println!("Device: {:?}", device);
 
-    let mut tokenizer =
-        LlamaTokenizer::from_pretrained("meta-llama/Meta-Llama-3-8B-Instruct", None)?;
+    let tokenizer = LlamaTokenizer::from_pretrained("meta-llama/Meta-Llama-3-8B", None, None)?;
     let model =
-        LlamaForCausalLM::from_pretrained("meta-llama/Meta-Llama-3-8B-Instruct", &device, None)?;
+        LlamaForCausalLM::from_pretrained("meta-llama/Meta-Llama-3-8B", &device, None, None)?;
 
     let mut encodings = tokenizer
-        .encode(vec!["Hello Llama".to_string()], true, None)
+        .encode(vec!["Once upon a time".to_string()], true, None)
         .map_err(Error::msg)?;
 
     encodings.to_device(&device)?;
-
-    println!("input ids {}", encodings.get_input_ids());
 
     let mut cache = DynamicCache::new();
 
     let start = std::time::Instant::now();
 
-    let mut tokens = &mut encodings.get_input_ids().to_vec2::<u32>()?[0];
+    let tokens = &mut encodings.get_input_ids().to_vec2::<u32>()?[0];
 
-    for index in 0..50 {
+    let mut input_ids = encodings.get_input_ids().clone();
+
+    println!("input_ids {}", input_ids);
+
+    for _index in 0..50 {
         // Predict next token
-        let output = model
-            .forward(ForwardParams {
-                input_ids: Some(encodings.get_input_ids()),
-                attention_mask: Some(encodings.get_attention_mask()),
-                cache: Some(&mut cache),
-                ..Default::default()
-            })?
-            .to_device(&Device::Cpu)?;
+        let output = model.forward(ForwardParams {
+            input_ids: Some(&input_ids),
+            cache: Some(&mut cache),
+            ..Default::default()
+        })?;
 
-        // dirty argmax
-        let next_token_id: u32 = output
-            .arg_sort_last_dim(false)?
-            .i((0, output.dims3()?.1 - 1, 0))?
-            .to_scalar()?;
+        // Take logits of the last token
+        let output = output.i((0, output.dims3()?.1 - 1, ..))?;
+
+        // Temperature sampling
+        //let output =
+        //    output.broadcast_div(&Tensor::new(&[0.7], &Device::Cpu)?.to_dtype(DType::F16)?)?;
+        // let output = softmax_last_dim(&output)?;
+        let next_token_id = output.argmax(0)?.to_scalar()?;
+        // println!("next token id {}", next_token_id);
+
         tokens.push(next_token_id);
-        let token = tokenizer.decode(&[next_token_id], true)?;
-        println!("token_id: {}, token: {}", next_token_id, token);
 
-        encodings = BatchEncoding::new(
-            Tensor::new(&[[next_token_id]], &device)?,
-            Tensor::new(&[[0u32]], &device)?,
-            Tensor::new(&[[0u32]], &device)?,
-            vec![],
-        );
-        encodings.to_device(&device)?;
+        input_ids = Tensor::new(&[[next_token_id]], &device)?;
     }
+
+    let text = tokenizer.decode(&tokens[..], true)?;
+    println!("generated text: {}", text);
 
     println!("Took: {:?}", start.elapsed());
 

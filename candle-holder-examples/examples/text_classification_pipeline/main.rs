@@ -7,7 +7,7 @@ fn main() -> Result<()> {
     let device = get_device_from_args()?;
     println!("Device: {:?}", device);
 
-    let mut pipeline = TextClassificationPipeline::new("gabrielmbmb/finbert", &device, None)?;
+    let pipeline = TextClassificationPipeline::new("gabrielmbmb/finbert", &device, None, None)?;
 
     let scores = pipeline.run("Stocks rallied and the British pound gained.", Some(1))?;
 

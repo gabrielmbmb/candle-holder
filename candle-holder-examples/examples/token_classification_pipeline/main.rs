@@ -7,7 +7,7 @@ fn main() -> Result<()> {
     let device = get_device_from_args()?;
     println!("Device: {:?}", device);
 
-    let mut pipeline = TokenClassificationPipeline::new("dslim/bert-base-NER", &device, None)?;
+    let pipeline = TokenClassificationPipeline::new("dslim/bert-base-NER", &device, None, None)?;
 
     let entities = pipeline.run("My name is Gabriel and I live in Madrid", None)?;
     println!("`pipeline.run` results: {:?}", entities);

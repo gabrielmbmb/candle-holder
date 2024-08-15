@@ -16,6 +16,7 @@ candle-holder-models = { path = "../candle-holder-models", version = "0.1.0", fe
 candle-holder-tokenizers = { path = "../candle-holder-tokenizers", version = "0.1.0" }
 candle-holder-pipelines = { path = "../candle-holder-pipelines", version = "0.1.0" }
 candle-core = { workspace = true }
+candle-nn = { workspace = true }
 anyhow = "1.0.86"
 
 [features]
