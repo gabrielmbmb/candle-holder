@@ -24,6 +24,7 @@ const ROBERTA_UNK_TOKEN: &str = "<unk>";
 #[derive(Debug)]
 pub struct RobertaTokenizer {
     tokenizer: CoreTokenizer,
+    padding_side: PaddingDirection,
     max_length: usize,
     bos_token: Option<String>,
     cls_token: Option<String>,
@@ -34,11 +35,12 @@ pub struct RobertaTokenizer {
     unk_token: Option<String>,
 }
 
-impl_tokenizer!(RobertaTokenizer, PaddingDirection::Right);
+impl_tokenizer!(RobertaTokenizer);
 
 /// `RobertaTokenizer` builder
 pub struct RobertaTokenizerBuilder {
     tokenizer_info: TokenizerInfo,
+    padding_side: Option<PaddingDirection>,
 }
 
 impl RobertaTokenizerBuilder {
@@ -69,8 +71,11 @@ impl RobertaTokenizerBuilder {
 }
 
 impl TokenizerBuilder<RobertaTokenizer> for RobertaTokenizerBuilder {
-    fn new(tokenizer_info: TokenizerInfo) -> Self {
-        RobertaTokenizerBuilder { tokenizer_info }
+    fn new(tokenizer_info: TokenizerInfo, padding_side: Option<PaddingDirection>) -> Self {
+        RobertaTokenizerBuilder {
+            tokenizer_info,
+            padding_side,
+        }
     }
 
     fn get_tokenizer_info(&self) -> &TokenizerInfo {
@@ -155,6 +160,7 @@ impl TokenizerBuilder<RobertaTokenizer> for RobertaTokenizerBuilder {
 
         Ok(RobertaTokenizer {
             tokenizer,
+            padding_side: self.padding_side.unwrap_or(PaddingDirection::Right),
             max_length,
             bos_token: Some(bos_token),
             cls_token: Some(cls_token),

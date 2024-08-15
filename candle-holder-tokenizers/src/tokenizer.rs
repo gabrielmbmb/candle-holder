@@ -29,9 +29,7 @@ pub enum Padding {
 pub trait Tokenizer: std::fmt::Debug {
     fn get_tokenizer(&self) -> &CoreTokenizer;
 
-    fn get_tokenizer_mut(&mut self) -> &mut CoreTokenizer;
-
-    fn get_tokenizer_with_padding(&mut self, padding: Padding) -> Result<&CoreTokenizer> {
+    fn get_tokenizer_with_padding(&self, padding: Padding) -> Result<CoreTokenizer> {
         let pad_token = self
             .get_pad_token()
             .ok_or_else(|| Error::MissingSpecialToken("pad_token".to_string()))?
@@ -49,7 +47,7 @@ pub trait Tokenizer: std::fmt::Debug {
             Padding::Fixed(length) => PaddingStrategy::Fixed(length),
         };
 
-        let tokenizer = self.get_tokenizer_mut();
+        let mut tokenizer = self.get_tokenizer().clone();
 
         tokenizer.with_padding(Some(PaddingParams {
             strategy,
@@ -133,14 +131,14 @@ pub trait Tokenizer: std::fmt::Debug {
     ///
     /// A `BatchEncoding` containing the encoded sequences.
     fn encode(
-        &mut self,
+        &self,
         inputs: Vec<String>,
         add_special_tokens: bool,
         padding: Option<Padding>,
     ) -> Result<BatchEncoding> {
         let tokenizer = match padding {
             Some(padding) => self.get_tokenizer_with_padding(padding)?,
-            None => self.get_tokenizer(),
+            None => self.get_tokenizer().clone(),
         };
 
         let encodings = tokenizer
@@ -181,14 +179,14 @@ pub trait Tokenizer: std::fmt::Debug {
     ///
     /// A `BatchEncoding` containing the encoded sequences.
     fn encode_sequence_pairs(
-        &mut self,
+        &self,
         sequence_pairs: Vec<(String, String)>,
         add_special_tokens: bool,
         padding: Option<Padding>,
     ) -> Result<BatchEncoding> {
         let tokenizer = match padding {
             Some(padding) => self.get_tokenizer_with_padding(padding)?,
-            None => self.get_tokenizer(),
+            None => self.get_tokenizer().clone(),
         };
 
         let encodings = tokenizer
@@ -228,18 +226,14 @@ pub trait Tokenizer: std::fmt::Debug {
 /// A macro that implements the `Tokenizer` trait for a given tokenizer type.
 #[macro_export]
 macro_rules! impl_tokenizer {
-    ($tokenizer_type:ty, $padding_dir:expr) => {
+    ($tokenizer_type:ty) => {
         impl Tokenizer for $tokenizer_type {
             fn get_tokenizer(&self) -> &CoreTokenizer {
                 &self.tokenizer
             }
 
-            fn get_tokenizer_mut(&mut self) -> &mut CoreTokenizer {
-                &mut self.tokenizer
-            }
-
             fn get_padding_side(&self) -> PaddingDirection {
-                $padding_dir
+                self.padding_side
             }
 
             fn get_max_length(&self) -> usize {
@@ -279,7 +273,7 @@ macro_rules! impl_tokenizer {
 
 /// A trait that defines the methods required to build a `Tokenizer`.
 pub trait TokenizerBuilder<T: Tokenizer> {
-    fn new(tokenizer_info: TokenizerInfo) -> Self;
+    fn new(tokenizer_info: TokenizerInfo, padding_side: Option<PaddingDirection>) -> Self;
     fn get_tokenizer_info(&self) -> &TokenizerInfo;
 
     fn build_tokenizer(&mut self) -> Result<CoreTokenizer> {
@@ -359,6 +353,7 @@ macro_rules! impl_auto_tokenizer_from_pretrained_method {
         impl $auto_tokenizer_struct {
             pub fn from_pretrained<S: AsRef<str>>(
                 repo_id: S,
+                padding_side: Option<PaddingDirection>,
                 params: Option<FromPretrainedParameters>
             ) -> Result<Box<dyn Tokenizer>> {
                 let tokenizer_info = from_pretrained(repo_id, params)?;
@@ -366,7 +361,7 @@ macro_rules! impl_auto_tokenizer_from_pretrained_method {
                 let tokenizer: Result<Box<dyn Tokenizer>> = match tokenizer_info.get_tokenizer_class() {
                     $(
                         $tokenizer_class => {
-                            $tokenizer_builder_struct::new(tokenizer_info)
+                            $tokenizer_builder_struct::new(tokenizer_info, padding_side)
                                 .build()
                                 .map(|tokenizer| Box::new(tokenizer) as Box<dyn Tokenizer>)
                         }
@@ -387,10 +382,12 @@ macro_rules! impl_tokenizer_from_pretrained_method {
         impl $tokenizer_struct {
             pub fn from_pretrained<S: AsRef<str>>(
                 repo_id: S,
+                padding_side: Option<PaddingDirection>,
                 params: Option<FromPretrainedParameters>,
             ) -> Result<Box<dyn Tokenizer>> {
                 let tokenizer_info = from_pretrained(repo_id, params)?;
-                let tokenizer = $tokenizer_builder_struct::new(tokenizer_info).build()?;
+                let tokenizer =
+                    $tokenizer_builder_struct::new(tokenizer_info, padding_side).build()?;
                 Ok(Box::new(tokenizer))
             }
         }

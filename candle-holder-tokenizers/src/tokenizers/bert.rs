@@ -24,6 +24,7 @@ const BERT_UNK_TOKEN: &str = "[UNK]";
 #[derive(Debug)]
 pub struct BertTokenizer {
     tokenizer: CoreTokenizer,
+    padding_side: PaddingDirection,
     max_length: usize,
     bos_token: Option<String>,
     cls_token: Option<String>,
@@ -34,11 +35,12 @@ pub struct BertTokenizer {
     unk_token: Option<String>,
 }
 
-impl_tokenizer!(BertTokenizer, PaddingDirection::Right);
+impl_tokenizer!(BertTokenizer);
 
 /// `BerTokenizer` builder.
 pub struct BertTokenizerBuilder {
     tokenizer_info: TokenizerInfo,
+    padding_side: Option<PaddingDirection>,
 }
 
 impl BertTokenizerBuilder {
@@ -89,8 +91,11 @@ impl BertTokenizerBuilder {
 }
 
 impl TokenizerBuilder<BertTokenizer> for BertTokenizerBuilder {
-    fn new(tokenizer_info: TokenizerInfo) -> Self {
-        BertTokenizerBuilder { tokenizer_info }
+    fn new(tokenizer_info: TokenizerInfo, padding_side: Option<PaddingDirection>) -> Self {
+        BertTokenizerBuilder {
+            tokenizer_info,
+            padding_side,
+        }
     }
 
     fn get_tokenizer_info(&self) -> &TokenizerInfo {
@@ -174,6 +179,7 @@ impl TokenizerBuilder<BertTokenizer> for BertTokenizerBuilder {
 
         Ok(BertTokenizer {
             tokenizer,
+            padding_side: self.padding_side.unwrap_or(PaddingDirection::Right),
             max_length,
             bos_token: None,
             cls_token: Some(cls_token),

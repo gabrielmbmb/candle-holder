@@ -14,6 +14,7 @@ const LLAMA_EOS_TOKEN: &str = "</s>";
 #[derive(Debug)]
 pub struct LlamaTokenizer {
     tokenizer: CoreTokenizer,
+    padding_side: PaddingDirection,
     max_length: usize,
     bos_token: Option<String>,
     cls_token: Option<String>,
@@ -24,18 +25,22 @@ pub struct LlamaTokenizer {
     unk_token: Option<String>,
 }
 
-impl_tokenizer!(LlamaTokenizer, PaddingDirection::Right);
+impl_tokenizer!(LlamaTokenizer);
 
 /// `LlamaTokenizer` builder
 pub struct LlamaTokenizerBuilder {
     tokenizer_info: TokenizerInfo,
+    padding_side: Option<PaddingDirection>,
 }
 
 impl LlamaTokenizerBuilder {}
 
 impl TokenizerBuilder<LlamaTokenizer> for LlamaTokenizerBuilder {
-    fn new(tokenizer_info: TokenizerInfo) -> Self {
-        LlamaTokenizerBuilder { tokenizer_info }
+    fn new(tokenizer_info: TokenizerInfo, padding_side: Option<PaddingDirection>) -> Self {
+        LlamaTokenizerBuilder {
+            tokenizer_info,
+            padding_side,
+        }
     }
 
     fn get_tokenizer_info(&self) -> &TokenizerInfo {
@@ -66,6 +71,7 @@ impl TokenizerBuilder<LlamaTokenizer> for LlamaTokenizerBuilder {
 
         Ok(LlamaTokenizer {
             tokenizer,
+            padding_side: self.padding_side.unwrap_or(PaddingDirection::Right),
             max_length,
             bos_token: Some(bos_token),
             cls_token: None,

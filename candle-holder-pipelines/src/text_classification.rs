@@ -35,7 +35,7 @@ impl TextClassificationPipeline {
             device,
             params.clone(),
         )?;
-        let tokenizer = AutoTokenizer::from_pretrained(identifier, params)?;
+        let tokenizer = AutoTokenizer::from_pretrained(identifier, None, params)?;
         Ok(Self {
             model,
             tokenizer,
@@ -43,7 +43,7 @@ impl TextClassificationPipeline {
         })
     }
 
-    fn preprocess(&mut self, inputs: Vec<String>) -> Result<BatchEncoding> {
+    fn preprocess(&self, inputs: Vec<String>) -> Result<BatchEncoding> {
         let mut encodings = self
             .tokenizer
             .encode(inputs, true, Some(Padding::Longest))?;
@@ -108,7 +108,7 @@ impl TextClassificationPipeline {
     ///
     /// A list containing the predicted label and the confidence score.
     pub fn run<I: Into<String>>(
-        &mut self,
+        &self,
         input: I,
         top_k: Option<usize>,
     ) -> Result<Vec<(String, f32)>> {
@@ -129,7 +129,7 @@ impl TextClassificationPipeline {
     ///
     /// A list containing the predicted label and the confidence score for each sequence.
     pub fn run_batch<I: Into<String>>(
-        &mut self,
+        &self,
         inputs: Vec<I>,
         top_k: Option<usize>,
     ) -> Result<Vec<Vec<(String, f32)>>> {

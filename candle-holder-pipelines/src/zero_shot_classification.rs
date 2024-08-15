@@ -53,7 +53,7 @@ impl ZeroShotClassificationPipeline {
             device,
             params.clone(),
         )?;
-        let tokenizer = AutoTokenizer::from_pretrained(identifier, params)?;
+        let tokenizer = AutoTokenizer::from_pretrained(identifier, None, params)?;
         let id2label = model
             .config()
             .id2label
@@ -78,7 +78,7 @@ impl ZeroShotClassificationPipeline {
     }
 
     fn preprocess(
-        &mut self,
+        &self,
         sentences: Vec<String>,
         candidate_labels: &[String],
         options: &ZeroShotClassificationOptions,
@@ -180,7 +180,7 @@ impl ZeroShotClassificationPipeline {
     ///
     /// A list containing the predicted label and the confidence score.
     pub fn run<I: Into<String>, L: AsRef<str>>(
-        &mut self,
+        &self,
         input: I,
         candidate_labels: Vec<L>,
         options: Option<ZeroShotClassificationOptions>,
@@ -208,7 +208,7 @@ impl ZeroShotClassificationPipeline {
     ///
     /// A list containing the predicted label and the confidence score for each sequence.
     pub fn run_batch<I: Into<String>, L: AsRef<str>>(
-        &mut self,
+        &self,
         inputs: Vec<I>,
         candidate_labels: Vec<L>,
         options: Option<ZeroShotClassificationOptions>,

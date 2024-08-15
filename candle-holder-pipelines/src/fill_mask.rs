@@ -41,7 +41,7 @@ impl FillMaskPipeline {
         params: Option<FromPretrainedParameters>,
     ) -> Result<Self> {
         let model = AutoModelForMaskedLM::from_pretrained(identifier, device, params.clone())?;
-        let tokenizer = AutoTokenizer::from_pretrained(identifier, params)?;
+        let tokenizer = AutoTokenizer::from_pretrained(identifier, None, params)?;
 
         Ok(Self {
             model,
@@ -63,7 +63,7 @@ impl FillMaskPipeline {
         Ok(())
     }
 
-    fn preprocess(&mut self, inputs: Vec<String>) -> Result<(BatchEncoding, Vec<Vec<u32>>)> {
+    fn preprocess(&self, inputs: Vec<String>) -> Result<(BatchEncoding, Vec<Vec<u32>>)> {
         let mut encodings = self
             .tokenizer
             .encode(inputs, true, Some(Padding::Longest))?;
@@ -158,7 +158,7 @@ impl FillMaskPipeline {
     ///
     /// The top k predictions for each mask token in the sentence.
     pub fn run<I: Into<String>>(
-        &mut self,
+        &self,
         input: I,
         options: Option<FillMaskOptions>,
     ) -> Result<Vec<Vec<FillMaskResult>>> {
@@ -179,7 +179,7 @@ impl FillMaskPipeline {
     ///
     /// The top k predictions for each mask token in each sentence.
     pub fn run_batch<I: Into<String>>(
-        &mut self,
+        &self,
         inputs: Vec<I>,
         options: Option<FillMaskOptions>,
     ) -> Result<Vec<Vec<Vec<FillMaskResult>>>> {

@@ -131,7 +131,7 @@ impl TokenClassificationPipeline {
     ) -> Result<Self> {
         let model =
             AutoModelForTokenClassification::from_pretrained(identifier, device, params.clone())?;
-        let tokenizer = AutoTokenizer::from_pretrained(identifier, params)?;
+        let tokenizer = AutoTokenizer::from_pretrained(identifier, None, params)?;
         let config = model.config();
         let id2label = config
             .id2label
@@ -145,7 +145,7 @@ impl TokenClassificationPipeline {
         })
     }
 
-    fn preprocess(&mut self, inputs: Vec<String>) -> Result<BatchEncoding> {
+    fn preprocess(&self, inputs: Vec<String>) -> Result<BatchEncoding> {
         let mut encodings = self
             .tokenizer
             .encode(inputs, true, Some(Padding::Longest))?;
@@ -479,7 +479,7 @@ impl TokenClassificationPipeline {
     ///
     /// The entities found in the sentence.
     pub fn run<I: Into<String>>(
-        &mut self,
+        &self,
         input: I,
         options: Option<TokenClassificationOptions>,
     ) -> Result<Vec<Entity>> {
@@ -513,7 +513,7 @@ impl TokenClassificationPipeline {
     ///
     /// The entities found in each sentence.
     pub fn run_batch<I: Into<String>>(
-        &mut self,
+        &self,
         inputs: Vec<I>,
         options: Option<TokenClassificationOptions>,
     ) -> Result<Vec<Vec<Entity>>> {
