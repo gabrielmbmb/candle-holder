@@ -8,12 +8,13 @@ use candle_nn::{
 };
 
 use crate::{
-    config::PretrainedConfig,
-    model::ForwardParams,
-    model::PreTrainedModel,
-    utils::attn_mask::{prepare_4d_causal_attention_mask, repeat_kv},
-    utils::cache::DynamicCache,
-    utils::flash_attn::flash_attn,
+    config::{GenerationConfig, PretrainedConfig},
+    model::{ForwardParams, PreTrainedModel},
+    utils::{
+        attn_mask::{prepare_4d_causal_attention_mask, repeat_kv},
+        cache::DynamicCache,
+        flash_attn::flash_attn,
+    },
 };
 
 use super::config::{HiddenAct, LlamaConfig};
@@ -403,6 +404,7 @@ pub struct LlamaForCausalLM {
     model: Llama,
     lm_head: Linear,
     config: LlamaConfig,
+    generation_config: GenerationConfig,
 }
 
 impl PreTrainedModel for LlamaForCausalLM {
@@ -415,7 +417,29 @@ impl PreTrainedModel for LlamaForCausalLM {
             model,
             lm_head,
             config,
+            generation_config: GenerationConfig::default(),
         })
+    }
+
+    fn load_with_generation_config(
+        vb: VarBuilder,
+        config: serde_json::Value,
+        generation_config: Option<GenerationConfig>,
+    ) -> Result<Self> {
+        let config: LlamaConfig = serde_json::from_value(config)?;
+        let model = Llama::load(vb.pp("model"), &config)?;
+        let lm_head = linear_no_bias(config.hidden_size, config.vocab_size, vb.pp("lm_head"))?;
+
+        Ok(Self {
+            model,
+            lm_head,
+            config,
+            generation_config: generation_config.unwrap_or_default(),
+        })
+    }
+
+    fn get_generation_config(&self) -> &GenerationConfig {
+        &self.generation_config
     }
 
     fn forward(&self, params: ForwardParams) -> Result<Tensor> {

@@ -82,7 +82,8 @@ enum StopStrings {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenerationConfig {
     /// The maximum number of tokens the sequence can have. Corresponds to the number of input
-    /// tokens + `max_new_tokens` that will be generated. The default is `20`.
+    /// tokens + `max_new_tokens` that will be generated. Its effect is overriden if
+    /// `max_new_tokens` is set. The default is `20`.
     #[serde(default)]
     max_length: usize,
     /// The maximun number of tokens to generate.
@@ -118,6 +119,16 @@ pub struct GenerationConfig {
     use_cache: bool,
     #[serde(default)]
     temperature: f64,
+}
+
+impl GenerationConfig {
+    pub fn get_max_length(&self) -> usize {
+        self.max_length
+    }
+
+    pub fn get_max_new_tokens(&self) -> Option<usize> {
+        self.max_new_tokens
+    }
 }
 
 impl Default for GenerationConfig {

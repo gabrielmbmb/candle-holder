@@ -85,14 +85,14 @@ pub trait PreTrainedModel {
     fn load_with_generation_config(
         _vb: VarBuilder,
         _config: serde_json::Value,
-        _generation_config: GenerationConfig,
+        _generation_config: Option<GenerationConfig>,
     ) -> Result<Self>
     where
         Self: Sized,
     {
         unimplemented!("`load_with_generation_config` method not implemented for this model");
     }
-    fn get_generation_config(&self) -> Option<&GenerationConfig> {
+    fn get_generation_config(&self) -> &GenerationConfig {
         unimplemented!("`get_generation_config` method not implemented for this model");
     }
     fn config(&self) -> &PretrainedConfig;
@@ -102,19 +102,15 @@ pub trait PreTrainedModel {
         input_ids: &Tensor,
         generation_config: Option<GenerationConfig>,
     ) -> Result<Tensor> {
-        let generation_config = generation_config.unwrap_or_else(|| {
-            self.get_generation_config()
-                .cloned()
-                .unwrap_or_else(|| GenerationConfig::default())
-        });
+        let generation_config =
+            generation_config.unwrap_or_else(|| self.get_generation_config().clone());
 
         let input_seq_len = input_ids.dims2()?.1;
-        println!("Input sequence length: {}", input_seq_len);
 
         // Calculate the number of max new tokens to be generated
         let max_new_tokens = generation_config
             .get_max_new_tokens()
-            .unwrap_or_else(|| generation_config.get_max_length());
+            .unwrap_or_else(|| generation_config.get_max_length() - input_seq_len);
 
         Ok(Tensor::new(&[[1u32]], &Device::Cpu)?)
     }
@@ -123,7 +119,7 @@ pub trait PreTrainedModel {
 /// Implement `from_pretrained` method for a model struct.
 #[macro_export]
 macro_rules! impl_from_pretrained_method {
-    ($model_struct:ident, $default_dtype:expr) => {
+    ($model_struct:ident, $default_dtype:expr, $load_generation_config:expr) => {
         impl $model_struct {
             /// Loads a model from the Hugging Face Hub.
             ///
@@ -150,7 +146,15 @@ macro_rules! impl_from_pretrained_method {
                     .clone();
                 let dtype = dtype.unwrap_or($default_dtype);
                 let vb = model_info.get_var_builder(dtype, device)?;
-                Self::load(vb, config)
+                if $load_generation_config {
+                    Self::load_with_generation_config(
+                        vb,
+                        config,
+                        model_info.get_generation_config().cloned(),
+                    )
+                } else {
+                    Self::load(vb, config)
+                }
             }
         }
     };
@@ -159,7 +163,7 @@ macro_rules! impl_from_pretrained_method {
 /// Implement `from_pretrained` method for the `AutoModel` struct.
 #[macro_export]
 macro_rules! impl_auto_model_from_pretrained_method {
-    ($auto_model_struct:ident, $(($model_type:expr, $model_struct:ident, $default_dtype:expr)), *) => {
+    ($auto_model_struct:ident, $(($model_type:expr, $model_struct:ident, $default_dtype:expr, $load_generation_config:expr)), *) => {
         impl $auto_model_struct {
             /// Loads a model from the Hugging Face Hub.
             ///
@@ -191,7 +195,11 @@ macro_rules! impl_auto_model_from_pretrained_method {
                         $model_type => {
                             let dtype = dtype.unwrap_or($default_dtype);
                             let vb = model_info.get_var_builder(dtype, device)?;
-                            Ok(Box::new($model_struct::load(vb, config)?))
+                            if $load_generation_config {
+                                Ok(Box::new($model_struct::load(vb, config)?))
+                            } else {
+                                Ok(Box::new($model_struct::load_with_generation_config(vb, config, model_info.get_generation_config().cloned())?))
+                            }
                         },
                     )*
                     _ => bail!(format!("Model '{}' type not supported", model_type)),
@@ -209,8 +217,8 @@ pub struct AutoModel {}
 
 impl_auto_model_from_pretrained_method!(
     AutoModel,
-    ("bert", BertModel, BERT_DTYPE),
-    ("llama", LlamaModel, LLAMA_DTYPE)
+    ("bert", BertModel, BERT_DTYPE, false),
+    ("llama", LlamaModel, LLAMA_DTYPE, false)
 );
 
 /// Alows to automatically load a `PreTrainedModel` for sequence classification from a Hugging Face
@@ -220,7 +228,7 @@ pub struct AutoModelForSequenceClassification {}
 
 impl_auto_model_from_pretrained_method!(
     AutoModelForSequenceClassification,
-    ("bert", BertForSequenceClassification, BERT_DTYPE)
+    ("bert", BertForSequenceClassification, BERT_DTYPE, false)
 );
 
 /// Alows to automatically load a `PreTrainedModel` for token classification from a Hugging Face
@@ -230,7 +238,7 @@ pub struct AutoModelForTokenClassification {}
 
 impl_auto_model_from_pretrained_method!(
     AutoModelForTokenClassification,
-    ("bert", BertForTokenClassification, BERT_DTYPE)
+    ("bert", BertForTokenClassification, BERT_DTYPE, false)
 );
 
 /// Alows to automatically load a `PreTrainedModel` for masked language modeling from a Hugging Face
@@ -240,7 +248,7 @@ pub struct AutoModelForMaskedLM {}
 
 impl_auto_model_from_pretrained_method!(
     AutoModelForMaskedLM,
-    ("bert", BertForMaskedLM, BERT_DTYPE)
+    ("bert", BertForMaskedLM, BERT_DTYPE, false)
 );
 
 /// Alows to automatically load a `PreTrainedModel` for causal language modeling from a Hugging Face
@@ -250,15 +258,15 @@ pub struct AutoModelForCausalLM {}
 
 impl_auto_model_from_pretrained_method!(
     AutoModelForCausalLM,
-    ("llama", LlamaForCausalLM, LLAMA_DTYPE)
+    ("llama", LlamaForCausalLM, LLAMA_DTYPE, true)
 );
 
 // Bert
-impl_from_pretrained_method!(BertModel, BERT_DTYPE);
-impl_from_pretrained_method!(BertForSequenceClassification, BERT_DTYPE);
-impl_from_pretrained_method!(BertForTokenClassification, BERT_DTYPE);
-impl_from_pretrained_method!(BertForMaskedLM, BERT_DTYPE);
+impl_from_pretrained_method!(BertModel, BERT_DTYPE, false);
+impl_from_pretrained_method!(BertForSequenceClassification, BERT_DTYPE, false);
+impl_from_pretrained_method!(BertForTokenClassification, BERT_DTYPE, false);
+impl_from_pretrained_method!(BertForMaskedLM, BERT_DTYPE, false);
 
 // Llama
-impl_from_pretrained_method!(LlamaModel, LLAMA_DTYPE);
-impl_from_pretrained_method!(LlamaForCausalLM, LLAMA_DTYPE);
+impl_from_pretrained_method!(LlamaModel, LLAMA_DTYPE, false);
+impl_from_pretrained_method!(LlamaForCausalLM, LLAMA_DTYPE, true);
