@@ -104,7 +104,7 @@ impl LlamaAttention {
     fn forward(
         &self,
         hidden_states: &Tensor,
-        causal_mask: &Tensor,
+        causal_mask: Option<&Tensor>,
         position_ids: &Tensor,
         layer_idx: usize,
         cache: Option<&mut DynamicCache>,
@@ -164,7 +164,9 @@ impl LlamaAttention {
                 (query_states.matmul(&key_states.t()?)? / (self.head_dim as f64).sqrt())?;
 
             // Apply causal attention mask
-            let attn_weights = attn_weights.broadcast_add(causal_mask)?;
+            if let Some(causal_mask) = causal_mask {
+                let attn_weights = attn_weights.broadcast_add(causal_mask)?;
+            }
 
             let attn_weights = softmax_last_dim(&attn_weights)?;
             let attn_weights = self.dropout.forward(&attn_weights, false)?;
@@ -277,7 +279,7 @@ impl LlamaDecoderLayer {
     fn forward(
         &self,
         hidden_states: &Tensor,
-        causal_mask: &Tensor,
+        causal_mask: Option<&Tensor>,
         position_ids: &Tensor,
         layer_idx: usize,
         cache: Option<&mut DynamicCache>,
@@ -337,9 +339,6 @@ impl Llama {
         let input_ids = params
             .get_input_ids()
             .ok_or(Error::MissingForwardParam("input_ids".to_string()))?;
-        let attention_mask = params
-            .get_attention_mask()
-            .ok_or(Error::MissingForwardParam("attention_mask".to_string()))?;
         let position_ids = match params.get_position_ids().cloned() {
             Some(position_ids) => position_ids,
             None => {
@@ -358,11 +357,17 @@ impl Llama {
         };
 
         let mut hidden_states = self.embed_tokens.forward(input_ids)?;
-        let causal_mask = prepare_4d_causal_attention_mask(attention_mask, DType::F32)?;
+        let causal_mask = match params.get_attention_mask() {
+            Some(attention_mask) => Some(prepare_4d_causal_attention_mask(
+                attention_mask,
+                DType::F32,
+            )?),
+            None => None,
+        };
         for (layer_idx, layer) in self.layers.iter().enumerate() {
             hidden_states = layer.forward(
                 &hidden_states,
-                &causal_mask,
+                causal_mask.as_ref(),
                 &position_ids,
                 layer_idx,
                 params.get_cache(),
