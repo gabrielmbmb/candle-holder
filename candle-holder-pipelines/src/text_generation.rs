@@ -1,4 +1,4 @@
-use candle_core::Device;
+use candle_core::{DType, Device};
 use candle_holder::{FromPretrainedParameters, Result};
 use candle_holder_models::{AutoModelForCausalLM, PreTrainedModel};
 use candle_holder_tokenizers::{AutoTokenizer, BatchEncoding, Padding, Tokenizer};
@@ -26,9 +26,11 @@ impl TextGenerationPipeline {
     pub fn new<S: AsRef<str> + Copy>(
         identifier: S,
         device: &Device,
+        dtype: Option<DType>,
         params: Option<FromPretrainedParameters>,
     ) -> Result<Self> {
-        let model = AutoModelForCausalLM::from_pretrained(identifier, device, params.clone())?;
+        let model =
+            AutoModelForCausalLM::from_pretrained(identifier, device, dtype, params.clone())?;
         let tokenizer =
             AutoTokenizer::from_pretrained(identifier, Some(PaddingDirection::Left), params)?;
         Ok(Self {

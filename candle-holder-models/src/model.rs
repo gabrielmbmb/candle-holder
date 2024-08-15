@@ -1,8 +1,8 @@
-use candle_core::{Device, Tensor};
+use candle_core::{DType, Device, Tensor};
 use candle_holder::{bail, utils::FromPretrainedParameters, Result};
 use candle_nn::VarBuilder;
 
-use crate::config::PretrainedConfig;
+use crate::config::{GenerationConfig, PretrainedConfig};
 use crate::from_pretrained::from_pretrained;
 use crate::models::bert::{
     BertForMaskedLM, BertForSequenceClassification, BertForTokenClassification, BertModel,
@@ -82,17 +82,48 @@ pub trait PreTrainedModel {
     fn load(vb: VarBuilder, config: serde_json::Value) -> Result<Self>
     where
         Self: Sized;
+    fn load_with_generation_config(
+        _vb: VarBuilder,
+        _config: serde_json::Value,
+        _generation_config: GenerationConfig,
+    ) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        unimplemented!("`load_with_generation_config` method not implemented for this model");
+    }
+    fn get_generation_config(&self) -> Option<&GenerationConfig> {
+        unimplemented!("`get_generation_config` method not implemented for this model");
+    }
     fn config(&self) -> &PretrainedConfig;
     fn forward(&self, params: ForwardParams) -> Result<Tensor>;
-    fn generate(&self, _params: ForwardParams) -> Result<Tensor> {
-        unimplemented!("generate method not implemented for this model");
+    fn generate(
+        &self,
+        input_ids: &Tensor,
+        generation_config: Option<GenerationConfig>,
+    ) -> Result<Tensor> {
+        let generation_config = generation_config.unwrap_or_else(|| {
+            self.get_generation_config()
+                .cloned()
+                .unwrap_or_else(|| GenerationConfig::default())
+        });
+
+        let input_seq_len = input_ids.dims2()?.1;
+        println!("Input sequence length: {}", input_seq_len);
+
+        // Calculate the number of max new tokens to be generated
+        let max_new_tokens = generation_config
+            .get_max_new_tokens()
+            .unwrap_or_else(|| generation_config.get_max_length());
+
+        Ok(Tensor::new(&[[1u32]], &Device::Cpu)?)
     }
 }
 
 /// Implement `from_pretrained` method for a model struct.
 #[macro_export]
 macro_rules! impl_from_pretrained_method {
-    ($model_struct:ident, $dtype:expr) => {
+    ($model_struct:ident, $default_dtype:expr) => {
         impl $model_struct {
             /// Loads a model from the Hugging Face Hub.
             ///
@@ -100,6 +131,7 @@ macro_rules! impl_from_pretrained_method {
             ///
             /// * `identifier` - The repository id of the model to load.
             /// * `device` - The device to run the model on.
+            /// * `dtype` - The numeric type in which the model parameters should be loaded.
             /// * `params` - Optional parameters to specify the revision, user agent, and auth token.
             ///
             /// # Returns
@@ -108,6 +140,7 @@ macro_rules! impl_from_pretrained_method {
             pub fn from_pretrained<S: AsRef<str>>(
                 repo_id: S,
                 device: &Device,
+                dtype: Option<DType>,
                 params: Option<FromPretrainedParameters>,
             ) -> Result<Self> {
                 let model_info = from_pretrained(repo_id, params)?;
@@ -115,7 +148,8 @@ macro_rules! impl_from_pretrained_method {
                     .get_config()
                     .expect("Model config not found. Cannot load the model.")
                     .clone();
-                let vb = model_info.get_var_builder($dtype, device)?;
+                let dtype = dtype.unwrap_or($default_dtype);
+                let vb = model_info.get_var_builder(dtype, device)?;
                 Self::load(vb, config)
             }
         }
@@ -125,7 +159,7 @@ macro_rules! impl_from_pretrained_method {
 /// Implement `from_pretrained` method for the `AutoModel` struct.
 #[macro_export]
 macro_rules! impl_auto_model_from_pretrained_method {
-    ($auto_model_struct:ident, $(($model_type:expr, $model_struct:ident, $dtype:expr)), *) => {
+    ($auto_model_struct:ident, $(($model_type:expr, $model_struct:ident, $default_dtype:expr)), *) => {
         impl $auto_model_struct {
             /// Loads a model from the Hugging Face Hub.
             ///
@@ -133,6 +167,7 @@ macro_rules! impl_auto_model_from_pretrained_method {
             ///
             /// * `identifier` - The repository id of the model to load.
             /// * `device` - The device to run the model on.
+            /// * `dtype` - The numeric type in which the model parameters should be loaded.
             /// * `params` - Optional parameters to specify the revision, user agent, and auth token.
             ///
             /// # Returns
@@ -141,6 +176,7 @@ macro_rules! impl_auto_model_from_pretrained_method {
             pub fn from_pretrained<S: AsRef<str>>(
                 repo_id: S,
                 device: &Device,
+                dtype: Option<DType>,
                 params: Option<FromPretrainedParameters>,
             ) -> Result<Box<dyn PreTrainedModel>> {
                 let model_info = from_pretrained(repo_id, params)?;
@@ -153,7 +189,8 @@ macro_rules! impl_auto_model_from_pretrained_method {
                 let model: Result<Box<dyn PreTrainedModel>> = match model_type {
                     $(
                         $model_type => {
-                            let vb = model_info.get_var_builder($dtype, device)?;
+                            let dtype = dtype.unwrap_or($default_dtype);
+                            let vb = model_info.get_var_builder(dtype, device)?;
                             Ok(Box::new($model_struct::load(vb, config)?))
                         },
                     )*

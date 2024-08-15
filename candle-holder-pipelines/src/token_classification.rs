@@ -1,4 +1,4 @@
-use candle_core::{Device, IndexOp, Tensor, D};
+use candle_core::{DType, Device, IndexOp, Tensor, D};
 use candle_holder::{Error, FromPretrainedParameters, Result};
 use candle_holder_models::{AutoModelForTokenClassification, ForwardParams, PreTrainedModel};
 use candle_holder_tokenizers::{AutoTokenizer, BatchEncoding, Padding, Tokenizer};
@@ -127,10 +127,15 @@ impl TokenClassificationPipeline {
     pub fn new<S: AsRef<str> + Copy>(
         identifier: S,
         device: &Device,
+        dtype: Option<DType>,
         params: Option<FromPretrainedParameters>,
     ) -> Result<Self> {
-        let model =
-            AutoModelForTokenClassification::from_pretrained(identifier, device, params.clone())?;
+        let model = AutoModelForTokenClassification::from_pretrained(
+            identifier,
+            device,
+            dtype,
+            params.clone(),
+        )?;
         let tokenizer = AutoTokenizer::from_pretrained(identifier, None, params)?;
         let config = model.config();
         let id2label = config
