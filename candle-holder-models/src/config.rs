@@ -117,8 +117,16 @@ pub struct GenerationConfig {
     /// Whether the model should use the past key/values attentions to speed up decoding.
     #[serde(default)]
     use_cache: bool,
+    /// The value used to modulate the next token probabilities. The default is `1.0`.
     #[serde(default)]
     temperature: f64,
+    /// The number of highest probability vocabulary tokens to keep for top-k-filtering. The
+    /// default is `50`.
+    #[serde(default)]
+    top_k: Option<usize>,
+    ///
+    #[serde(default)]
+    top_p: Option<f32>,
 }
 
 impl GenerationConfig {
@@ -128,6 +136,26 @@ impl GenerationConfig {
 
     pub fn get_max_new_tokens(&self) -> Option<usize> {
         self.max_new_tokens
+    }
+
+    pub fn get_do_sample(&self) -> bool {
+        self.do_sample
+    }
+
+    pub fn get_use_cache(&self) -> bool {
+        self.use_cache
+    }
+
+    pub fn get_temperature(&self) -> f64 {
+        self.temperature
+    }
+
+    pub fn get_top_k(&self) -> Option<usize> {
+        self.top_k
+    }
+
+    pub fn get_top_p(&self) -> Option<f32> {
+        self.top_p
     }
 }
 
@@ -146,6 +174,8 @@ impl Default for GenerationConfig {
             penalty_alpha: None,
             use_cache: true,
             temperature: 1.0,
+            top_k: Some(50),
+            top_p: Some(1.0),
         }
     }
 }

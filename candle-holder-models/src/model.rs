@@ -1,9 +1,10 @@
-use candle_core::{DType, Device, Tensor};
+use candle_core::{DType, Device, IndexOp, Tensor, D};
 use candle_holder::{bail, utils::FromPretrainedParameters, Result};
 use candle_nn::VarBuilder;
 
 use crate::config::{GenerationConfig, PretrainedConfig};
 use crate::from_pretrained::from_pretrained;
+use crate::generation::SamplingConfig;
 use crate::models::bert::{
     BertForMaskedLM, BertForSequenceClassification, BertForTokenClassification, BertModel,
     BERT_DTYPE,
@@ -97,6 +98,8 @@ pub trait PreTrainedModel {
     }
     fn config(&self) -> &PretrainedConfig;
     fn forward(&self, params: ForwardParams) -> Result<Tensor>;
+
+    ///
     fn generate(
         &self,
         input_ids: &Tensor,
@@ -107,10 +110,38 @@ pub trait PreTrainedModel {
 
         let input_seq_len = input_ids.dims2()?.1;
 
-        // Calculate the number of max new tokens to be generated
+        // Calculate the number of max new tokens to be generated if `max_new_tokens` not provided
         let max_new_tokens = generation_config
             .get_max_new_tokens()
             .unwrap_or_else(|| generation_config.get_max_length() - input_seq_len);
+
+        let mut input_ids = input_ids.clone();
+
+        let mut cache = if generation_config.get_use_cache() {
+            Some(DynamicCache::new())
+        } else {
+            None
+        };
+
+        let sampling_config = SamplingConfig::from(generation_config);
+
+        for _index in 0..max_new_tokens {
+            let output = self.forward(ForwardParams {
+                input_ids: Some(&input_ids),
+                cache: cache.as_mut(),
+                ..Default::default()
+            })?;
+
+            let last_token_logits = output.i((.., output.dims3()?.1 - 1, ..))?;
+
+            // TODO: apply repeat penalty
+
+            let next_token_id = sampling_config.sample(&last_token_logits)?;
+
+            input_ids = next_token_id.unsqueeze(0)?;
+
+            // TODO: check for every sequence the stop condition or eos token
+        }
 
         Ok(Tensor::new(&[[1u32]], &Device::Cpu)?)
     }

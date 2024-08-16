@@ -1,5 +1,6 @@
 pub mod config;
 pub mod from_pretrained;
+pub mod generation;
 pub mod model;
 pub mod models;
 pub mod utils;
