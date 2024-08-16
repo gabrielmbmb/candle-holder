@@ -1,7 +1,9 @@
 pub mod error;
+pub mod ops;
 pub mod utils;
 
 pub use error::Error;
+pub use ops::TopKLastDimOp;
 pub use utils::FromPretrainedParameters;
 
 /// A type alias for `Result<T, Error>` for the `candle-holder` crate.
