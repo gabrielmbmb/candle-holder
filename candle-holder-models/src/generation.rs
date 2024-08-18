@@ -113,6 +113,18 @@ impl LogitSampler {
         unimplemented!("")
     }
 
+    /// Sample the next token using Top-p sampling also known as nucleus sampling. It takes the top
+    /// probabilities that sum equal or greater than `p` and samples from them using a multinomial
+    /// distribution.
+    ///
+    /// # Arguments
+    ///
+    /// * `probs` - The probabilities of the tokens.
+    /// * `p` - The cumulative probability threshold.
+    ///
+    /// # Returns
+    ///
+    /// The index of the sampled token.
     fn top_p_sample(&mut self, probs: &[f32], p: f32) -> Result<u32> {
         // Sort the probabilities in desc order
         let mut sorted_probs: Vec<(usize, f32)> = probs
