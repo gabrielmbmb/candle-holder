@@ -18,6 +18,7 @@ candle-flash-attn = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 hf-hub = { workspace = true }
+rand = "0.8.5"
 
 [features]
 tokenizers = ["candle-holder-tokenizers"]

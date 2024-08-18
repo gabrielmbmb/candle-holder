@@ -4,7 +4,7 @@ use candle_nn::VarBuilder;
 
 use crate::config::{GenerationConfig, PretrainedConfig};
 use crate::from_pretrained::from_pretrained;
-use crate::generation::SamplingConfig;
+use crate::generation::LogitSampler;
 use crate::models::bert::{
     BertForMaskedLM, BertForSequenceClassification, BertForTokenClassification, BertModel,
     BERT_DTYPE,
@@ -104,6 +104,7 @@ pub trait PreTrainedModel {
         &self,
         input_ids: &Tensor,
         generation_config: Option<GenerationConfig>,
+        seed: Option<u64>,
     ) -> Result<Tensor> {
         let generation_config =
             generation_config.unwrap_or_else(|| self.get_generation_config().clone());
@@ -115,30 +116,35 @@ pub trait PreTrainedModel {
             .get_max_new_tokens()
             .unwrap_or_else(|| generation_config.get_max_length() - input_seq_len);
 
-        let mut input_ids = input_ids.clone();
-
         let mut cache = if generation_config.get_use_cache() {
             Some(DynamicCache::new())
         } else {
             None
         };
 
-        let sampling_config = SamplingConfig::from(generation_config);
-
+        let mut sampling_config = LogitSampler::from_generation_config(generation_config, seed);
+        let mut sequences_next_tokens: Vec<Vec<u32>> = Vec::new();
         for _index in 0..max_new_tokens {
-            let output = self.forward(ForwardParams {
+            let logits = self.forward(ForwardParams {
                 input_ids: Some(&input_ids),
                 cache: cache.as_mut(),
                 ..Default::default()
             })?;
+            let dims = logits.dims3()?;
 
-            let last_token_logits = output.i((.., output.dims3()?.1 - 1, ..))?;
+            let last_token_logits = logits.i((.., dims.1 - 1, ..))?;
 
-            // TODO: apply repeat penalty
+            // TODO: apply repeat penalty, frequency penalty
 
-            let next_token_id = sampling_config.sample(&last_token_logits)?;
+            for i in 0..dims.0 {
+                let seq_logits = last_token_logits.i((i, ..))?;
+                let next_token_id = sampling_config.sample(&seq_logits)?;
+                sequences_next_tokens[i].push(next_token_id);
+            }
 
-            input_ids = next_token_id.unsqueeze(0)?;
+            if _index == 20 {
+                break;
+            }
 
             // TODO: check for every sequence the stop condition or eos token
         }
