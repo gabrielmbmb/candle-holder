@@ -14,14 +14,15 @@ pub enum Error {
     #[error("Tokenizer build error: {0}")]
     TokenizerBuildError(String),
 
-    #[error("The tokenizer is missing the special token `{0}`")]
+    // Special tokens errors
+    #[error("Missing the special token `{0}`.")]
     MissingSpecialToken(String),
 
-    #[error("The tokenizer is missing the id of the special token `{0}`")]
+    #[error("Missing the id of the special token `{0}`.")]
     MissingSpecialTokenId(String),
 
     // Tokenizer encoding errors
-    #[error("Tokenizer encoding error: {0}")]
+    #[error("Tokenizer encoding error: {0}.")]
     TokenizerEncodingError(String),
 
     // `forward` method errors

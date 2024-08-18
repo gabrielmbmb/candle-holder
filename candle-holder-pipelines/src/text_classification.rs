@@ -60,19 +60,17 @@ impl TextClassificationPipeline {
         model_outputs: Tensor,
         top_k: Option<usize>,
     ) -> Result<Vec<Vec<(String, f32)>>> {
-        let config = self.model.config();
+        let config = self.model.get_config();
         // TODO: move this to `new` method to avoid cloning every time?
         let id2label = config
-            .clone()
-            .id2label
+            .get_id2label()
             .ok_or_else(|| Error::msg("id2label not found in model config"))?;
 
+        let problem_type = config.get_problem_type();
         let scores = {
-            if config.problem_type == ProblemType::MultiLabelClassification
-                || config.num_labels() == 1
-            {
+            if *problem_type == ProblemType::MultiLabelClassification || config.num_labels() == 1 {
                 sigmoid(&model_outputs)?
-            } else if config.problem_type == ProblemType::SingleLabelClassification
+            } else if *problem_type == ProblemType::SingleLabelClassification
                 || config.num_labels() > 1
             {
                 softmax(&model_outputs, D::Minus1)?

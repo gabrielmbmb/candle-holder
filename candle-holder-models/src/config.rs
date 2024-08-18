@@ -24,10 +24,38 @@ impl Default for ProblemType {
 pub struct PretrainedConfig {
     /// The type of problem the model was trained on.
     #[serde(default)]
-    pub problem_type: ProblemType,
+    problem_type: ProblemType,
     /// A map of the label ids to their corresponding labels.
     #[serde(default, deserialize_with = "deserialize_id2label")]
-    pub id2label: Option<HashMap<usize, String>>,
+    id2label: Option<HashMap<usize, String>>,
+    /// The ID of the PAD token.
+    pad_token_id: Option<u32>,
+    /// The ID of the BOS token.
+    bos_token_id: Option<u32>,
+    /// The ID of the EOS token.
+    eos_token_id: Option<u32>,
+}
+
+impl PretrainedConfig {
+    pub fn get_problem_type(&self) -> &ProblemType {
+        &self.problem_type
+    }
+
+    pub fn get_id2label(&self) -> Option<&HashMap<usize, String>> {
+        self.id2label.as_ref()
+    }
+
+    pub fn get_pad_token_id(&self) -> Option<u32> {
+        self.pad_token_id
+    }
+
+    pub fn get_bos_token_id(&self) -> Option<u32> {
+        self.bos_token_id
+    }
+
+    pub fn get_eos_token_id(&self) -> Option<u32> {
+        self.eos_token_id
+    }
 }
 
 fn deserialize_id2label<'de, D>(deserializer: D) -> Result<Option<HashMap<usize, String>>, D::Error>
@@ -61,19 +89,22 @@ impl Default for PretrainedConfig {
         Self {
             problem_type: ProblemType::None,
             id2label: Some(HashMap::new()),
+            pad_token_id: None,
+            bos_token_id: None,
+            eos_token_id: None,
         }
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-enum EarlyStopping {
+pub enum EarlyStopping {
     Bool(bool),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
-enum StopStrings {
+pub enum StopStrings {
     Single(String),
     Multiple(Vec<String>),
 }
@@ -85,48 +116,48 @@ pub struct GenerationConfig {
     /// tokens + `max_new_tokens` that will be generated. Its effect is overriden if
     /// `max_new_tokens` is set. The default is `20`.
     #[serde(default)]
-    max_length: usize,
+    pub max_length: usize,
     /// The maximun number of tokens to generate.
-    max_new_tokens: Option<usize>,
+    pub max_new_tokens: Option<usize>,
     /// The minimun number of tokens the sequence to be generated should have. Corresponds to the
     /// number of input tokens + `min_new_tokens` that will be generated.
-    min_length: Option<usize>,
+    pub min_length: Option<usize>,
     /// Controls the stopping condition for beam-based methods. It accepts the following values:
     ///
     /// - `True`: generation stops as soon as there are `num_beams` complete candidates.
     /// - `False`: an heuristic is applied to determine if it's very unlikely to find better
     /// candidates and the generation should stop.
     /// - `"never"`: beam search only stops when there cannot be better candidates.
-    early_stopping: Option<EarlyStopping>,
+    pub early_stopping: Option<EarlyStopping>,
     /// The maximum amount of time that computation should be allowed to run in seconds.
-    max_time: Option<f64>,
+    pub max_time: Option<f64>,
     /// A string or a list of strings that should terminate the generation if the model outputs
     /// them.
-    stop_strings: Option<StopStrings>,
+    pub stop_strings: Option<StopStrings>,
     /// Whether or not to use sampling. If `false`, then greedy decoding will be used. The default
     /// is `false`.
     #[serde(default)]
-    do_sample: bool,
+    pub do_sample: bool,
     /// Number of beams for beam search. `1` means no beam search. The default is `1`.
     #[serde(default)]
-    num_beams: usize,
+    pub num_beams: usize,
     /// Number of groups to divide `num_beams`
     #[serde(default)]
-    num_beam_groups: usize,
-    penalty_alpha: Option<f64>,
+    pub num_beam_groups: usize,
+    pub penalty_alpha: Option<f64>,
     /// Whether the model should use the past key/values attentions to speed up decoding.
     #[serde(default)]
-    use_cache: bool,
+    pub use_cache: bool,
     /// The value used to modulate the next token probabilities. The default is `1.0`.
     #[serde(default)]
-    temperature: f64,
+    pub temperature: f64,
     /// The number of highest probability vocabulary tokens to keep for top-k-filtering. The
     /// default is `50`.
     #[serde(default)]
-    top_k: Option<usize>,
+    pub top_k: Option<usize>,
     ///
     #[serde(default)]
-    top_p: Option<f32>,
+    pub top_p: Option<f32>,
 }
 
 impl GenerationConfig {

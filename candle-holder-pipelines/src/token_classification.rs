@@ -137,10 +137,10 @@ impl TokenClassificationPipeline {
             params.clone(),
         )?;
         let tokenizer = AutoTokenizer::from_pretrained(identifier, None, params)?;
-        let config = model.config();
+        let config = model.get_config();
         let id2label = config
-            .id2label
-            .clone()
+            .get_id2label()
+            .cloned()
             .ok_or_else(|| Error::msg("id2label not found in model config"))?;
         Ok(Self {
             model,

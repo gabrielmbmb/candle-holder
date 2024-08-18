@@ -109,7 +109,7 @@ impl LogitSampler {
         Ok(softmax_last_dim(&scaled_logits)?)
     }
 
-    fn top_k_sample(&self, probs: &[f32], k: usize) -> Result<u32> {
+    fn top_k_sample(&self, _probs: &[f32], _k: usize) -> Result<u32> {
         unimplemented!("")
     }
 
@@ -155,7 +155,7 @@ impl LogitSampler {
         Ok(sorted_probs[sampled_index as usize].0 as u32)
     }
 
-    fn top_k_top_p_sample(&self, probs: &[f32], k: usize, p: f32) -> Result<u32> {
+    fn top_k_top_p_sample(&self, _probs: &[f32], _k: usize, _p: f32) -> Result<u32> {
         unimplemented!("")
     }
 

@@ -1,4 +1,4 @@
-use candle_core::{Tensor, D};
+use candle_core::Tensor;
 use candle_holder::Result;
 
 /// Dynamic cache for storing key and value states of each attention layer of a model.

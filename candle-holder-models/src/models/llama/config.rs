@@ -36,9 +36,6 @@ pub struct LlamaConfig {
     pub initializer_range: f64,
     pub rms_norm_eps: f64,
     pub use_cache: Option<bool>,
-    pub pad_token_id: Option<usize>,
-    pub bos_token_id: Option<usize>,
-    pub eos_token_id: Option<usize>,
     pub pretraining_tp: Option<usize>,
     pub tie_word_embeddings: Option<bool>,
     pub rope_theta: Option<f32>,
@@ -46,7 +43,7 @@ pub struct LlamaConfig {
     pub attention_bias: Option<bool>,
     pub attention_dropout: Option<f32>,
 
-    #[serde(flatten, default)]
+    #[serde(flatten)]
     pub pretrained_config: PretrainedConfig,
 }
 
@@ -70,9 +67,6 @@ impl Default for LlamaConfig {
             initializer_range: 0.02,
             rms_norm_eps: 1e-6,
             use_cache: Some(true),
-            pad_token_id: None,
-            bos_token_id: Some(1),
-            eos_token_id: Some(2),
             pretraining_tp: Some(1),
             tie_word_embeddings: Some(true),
             rope_theta: Some(10000.0),

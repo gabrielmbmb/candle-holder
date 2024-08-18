@@ -161,12 +161,12 @@ impl LlamaAttention {
             let key_states = key_states.to_dtype(DType::F32)?;
             let value_states = value_states.to_dtype(DType::F32)?;
 
-            let attn_weights =
+            let mut attn_weights =
                 (query_states.matmul(&key_states.t()?)? / (self.head_dim as f64).sqrt())?;
 
             // Apply causal attention mask
             if let Some(causal_mask) = causal_mask {
-                let attn_weights = attn_weights.broadcast_add(causal_mask)?;
+                attn_weights = attn_weights.broadcast_add(causal_mask)?;
             }
 
             let attn_weights = softmax_last_dim(&attn_weights)?;
@@ -395,7 +395,7 @@ impl PreTrainedModel for LlamaModel {
         Ok(self.model.forward(params)?)
     }
 
-    fn config(&self) -> &PretrainedConfig {
+    fn get_config(&self) -> &PretrainedConfig {
         &self.config.pretrained_config
     }
 }
@@ -448,7 +448,7 @@ impl PreTrainedModel for LlamaForCausalLM {
         Ok(logits)
     }
 
-    fn config(&self) -> &PretrainedConfig {
+    fn get_config(&self) -> &PretrainedConfig {
         &self.config.pretrained_config
     }
 }

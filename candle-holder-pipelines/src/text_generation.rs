@@ -52,7 +52,7 @@ impl TextGenerationPipeline {
     }
 
     pub fn run<I: Into<String>>(&self, input: I) -> Result<()> {
-        let encodings = self.preprocess(vec![input.into()])?;
+        let _encodings = self.preprocess(vec![input.into()])?;
         Ok(())
     }
 

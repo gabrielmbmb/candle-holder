@@ -57,9 +57,8 @@ impl ZeroShotClassificationPipeline {
         )?;
         let tokenizer = AutoTokenizer::from_pretrained(identifier, None, params)?;
         let id2label = model
-            .config()
-            .id2label
-            .clone()
+            .get_config()
+            .get_id2label()
             .ok_or_else(|| Error::msg("id2label not found in model config"))?;
         let num_labels = id2label.len();
         let entailment_id = id2label
