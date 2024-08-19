@@ -151,20 +151,10 @@ impl LogitSampler {
     ///
     /// The index of the sampled token.
     fn top_k_sample(&mut self, probs: &[f32], k: usize) -> Result<u32> {
-        println!("top_k_sample");
         if probs.len() <= k {
             return self.sample_multinomial(probs);
         }
-
-        // Sort the probabilities in desc order
-        let mut sorted_probs: Vec<(usize, f32)> = probs
-            .iter()
-            .enumerate()
-            .map(|(i, &prob)| (i, prob))
-            .collect();
-        sorted_probs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
-
-        // Get the top `k` probabilities
+        let sorted_probs = sort_probs(probs);
         let top_k_probs: Vec<f32> = sorted_probs[..k].iter().map(|&(_, prob)| prob).collect();
         let sampled_index = self.sample_multinomial(&top_k_probs)?;
         Ok(sorted_probs[sampled_index as usize].0 as u32)
@@ -183,13 +173,7 @@ impl LogitSampler {
     ///
     /// The index of the sampled token.
     fn top_p_sample(&mut self, probs: &[f32], p: f32) -> Result<u32> {
-        // Sort the probabilities in desc order
-        let mut sorted_probs: Vec<(usize, f32)> = probs
-            .iter()
-            .enumerate()
-            .map(|(i, &prob)| (i, prob))
-            .collect();
-        sorted_probs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        let sorted_probs = sort_probs(probs);
 
         // Compute the cumulative probabilities and get the index where `cumsum >= top_p` ensuring
         // that we include at least one token.
@@ -212,13 +196,77 @@ impl LogitSampler {
         Ok(sorted_probs[sampled_index as usize].0 as u32)
     }
 
-    fn top_k_top_p_sample(&self, _probs: &[f32], _k: usize, _p: f32) -> Result<u32> {
-        unimplemented!("")
+    /// Sample the next token using Top-k and Top-p sampling. It first applies top-k filtering to
+    /// the probabilities and then applies top-p filtering on the top-k probabilities. Finally, it
+    /// samples from the filtered probabilities using a multinomial distribution.
+    ///
+    /// # Arguments
+    ///
+    /// * `probs` - The probabilities of the tokens.
+    /// * `k` - The number of top probabilities to consider.
+    /// * `p` - The cumulative probability threshold.
+    ///
+    /// # Returns
+    ///
+    /// The index of the sampled token.
+    fn top_k_top_p_sample(&mut self, probs: &[f32], k: usize, p: f32) -> Result<u32> {
+        // Apply top-k filtering
+        let sorted_probs = sort_probs(probs);
+        let top_k_probs: Vec<(usize, f32)> = sorted_probs.into_iter().take(k).collect();
+
+        // Apply top-p filtering on the top-k probabilities
+        let mut cumsum = 0.0;
+        let cutoff_index = top_k_probs
+            .iter()
+            .take_while(|&&(_, prob)| {
+                cumsum += prob;
+                cumsum < p
+            })
+            .count()
+            .max(1); // Ensure we include at least one token
+
+        // Extract probabilities for sampling
+        let final_probs: Vec<f32> = top_k_probs[..cutoff_index]
+            .iter()
+            .map(|&(_, prob)| prob)
+            .collect();
+        let sampled_index = self.sample_multinomial(&final_probs)?;
+        Ok(top_k_probs[sampled_index as usize].0 as u32)
     }
 
+    /// Sample a token from the multinomial distribution defined by the probabilities.
+    ///
+    /// # Arguments
+    ///
+    /// * `probs` - The probabilities of the tokens.
+    ///
+    /// # Returns
+    ///
+    /// The index of the sampled token.
     fn sample_multinomial(&mut self, probs: &[f32]) -> Result<u32> {
         let dist = WeightedIndex::new(probs).map_err(Error::wrap)?;
         let sampled_token = dist.sample(&mut self.rng) as u32;
         Ok(sampled_token)
     }
+}
+
+/// Sort the probabilities in descending order and return the sorted probabilities along with their
+/// indices.
+///
+/// # Arguments
+///
+/// * `probs` - The probabilities to sort.
+///
+/// # Returns
+///
+/// A vector of tuples containing the index and the probability of each token, sorted in descending
+/// order.
+fn sort_probs(probs: &[f32]) -> Vec<(usize, f32)> {
+    let mut sorted_probs: Vec<(usize, f32)> = probs
+        .iter()
+        .enumerate()
+        .map(|(i, &prob)| (i, prob))
+        .collect();
+    sorted_probs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+    sorted_probs
 }
