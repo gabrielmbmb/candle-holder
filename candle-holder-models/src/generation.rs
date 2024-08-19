@@ -9,15 +9,26 @@ use crate::config::GenerationConfig;
 /// An enum containing the available sampling strategies for selecting the next token id of a
 /// sequence using the outputs logits of an auto-regressive model.
 pub enum SamplingStrategy {
+    /// Greedy sampling selects the token with the highest probability.
     Greedy,
+    /// Top-k sampling selects the token from the top `k` most probable tokens.
     TopK(usize),
+    /// Top-p sampling selects the token from the smallest set of tokens whose cumulative
+    /// probability exceeds the threshold `p`.
     TopP(f32),
-    TopKTopP { k: usize, p: f32 },
+    TopKTopP {
+        k: usize,
+        p: f32,
+    },
 }
 
+/// A struct for sampling the next token id from the logits of an auto-regressive model.
 pub struct LogitSampler {
+    /// The sampling strategy to use.
     strategy: SamplingStrategy,
+    /// The temperature to apply to the logits before sampling.
     temperature: Option<f64>,
+    /// The random number generator used in the multinomial sampling.
     rng: rand::rngs::StdRng,
 }
 
@@ -34,6 +45,16 @@ impl LogitSampler {
         }
     }
 
+    /// Create a new `LogitSampler` from a `GenerationConfig` and an optional seed.
+    ///
+    /// # Arguments
+    ///
+    /// * `generation_config` - The generation configuration to use.
+    /// * `seed` - The seed to use for the random number generator.
+    ///
+    /// # Returns
+    ///
+    /// A new `LogitSampler` instance.
     pub fn from_generation_config(generation_config: GenerationConfig, seed: Option<u64>) -> Self {
         let rng = Self::build_rng_from_seed(seed);
 
@@ -71,6 +92,15 @@ impl LogitSampler {
         rand::rngs::StdRng::seed_from_u64(seed)
     }
 
+    /// Sample the next token id from the logits.
+    ///
+    /// # Arguments
+    ///
+    /// * `logits` - The logits to sample from.
+    ///
+    /// # Returns
+    ///
+    /// The ID of the sampled token.
     pub fn sample(&mut self, logits: &Tensor) -> Result<u32> {
         if self.temperature.is_none() {
             return Ok(logits.argmax(D::Minus1)?.to_scalar()?);
@@ -109,8 +139,35 @@ impl LogitSampler {
         Ok(softmax_last_dim(&scaled_logits)?)
     }
 
-    fn top_k_sample(&self, _probs: &[f32], _k: usize) -> Result<u32> {
-        unimplemented!("")
+    /// Sample the next token using Top-k sampling. It takes the top `k` probabilities and samples
+    /// from them using a multinomial distribution.
+    ///
+    /// # Arguments
+    ///
+    /// * `probs` - The probabilities of the tokens.
+    /// * `k` - The number of top probabilities to consider.
+    ///
+    /// # Returns
+    ///
+    /// The index of the sampled token.
+    fn top_k_sample(&mut self, probs: &[f32], k: usize) -> Result<u32> {
+        println!("top_k_sample");
+        if probs.len() <= k {
+            return self.sample_multinomial(probs);
+        }
+
+        // Sort the probabilities in desc order
+        let mut sorted_probs: Vec<(usize, f32)> = probs
+            .iter()
+            .enumerate()
+            .map(|(i, &prob)| (i, prob))
+            .collect();
+        sorted_probs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+
+        // Get the top `k` probabilities
+        let top_k_probs: Vec<f32> = sorted_probs[..k].iter().map(|&(_, prob)| prob).collect();
+        let sampled_index = self.sample_multinomial(&top_k_probs)?;
+        Ok(sorted_probs[sampled_index as usize].0 as u32)
     }
 
     /// Sample the next token using Top-p sampling also known as nucleus sampling. It takes the top
