@@ -155,7 +155,7 @@ pub struct GenerationConfig {
     /// default is `50`.
     #[serde(default)]
     pub top_k: Option<usize>,
-    ///
+    /// The cumulative probability threshold for nucleus sampling. The default is `1.0`.
     #[serde(default)]
     pub top_p: Option<f32>,
 }
