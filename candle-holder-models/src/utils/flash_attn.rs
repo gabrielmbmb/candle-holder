@@ -20,11 +20,11 @@ pub fn flash_attn(
 
 #[cfg(not(feature = "flash-attn"))]
 pub fn flash_attn(
-    q: &Tensor,
-    k: &Tensor,
-    v: &Tensor,
-    softmax_scale: f32,
-    causal: bool,
+    _q: &Tensor,
+    _k: &Tensor,
+    _v: &Tensor,
+    _softmax_scale: f32,
+    _causal: bool,
 ) -> Result<Tensor> {
     unimplemented!("compile with flash-attn")
 }
