@@ -149,6 +149,9 @@ pub trait PreTrainedModel {
         let mut sequences_next_tokens: Vec<Vec<u32>> = vec![Vec::new(); num_sequences];
         let mut active_sequences = num_sequences;
 
+        // TODO: if `generation_config.num_return_sequences>1` then we need to expand the
+        // `input_ids` tensor to have `num_return_sequences` times the number of sequences
+
         // Generation loop
         for _index in 0..max_new_tokens {
             if active_sequences == 0 {
