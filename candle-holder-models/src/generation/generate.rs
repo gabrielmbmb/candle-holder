@@ -16,7 +16,7 @@ use crate::{config::GenerationConfig, utils::cache::DynamicCache, ForwardParams,
 /// # Returns
 ///
 /// A vector containing vectors of token ids for each input sequence.
-pub fn generate<M: PreTrainedModel>(
+pub fn generate<M: PreTrainedModel + ?Sized>(
     model: &M,
     input_ids: &Tensor,
     generation_config: GenerationConfig,

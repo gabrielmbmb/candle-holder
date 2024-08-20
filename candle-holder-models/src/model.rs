@@ -117,10 +117,7 @@ pub trait PreTrainedModel {
         input_ids: &Tensor,
         generation_config: Option<GenerationConfig>,
         seed: Option<u64>,
-    ) -> Result<Vec<Vec<u32>>>
-    where
-        Self: Sized,
-    {
+    ) -> Result<Vec<Vec<u32>>> {
         let generation_config =
             generation_config.unwrap_or_else(|| self.get_generation_config().clone());
         generate(self, input_ids, generation_config, seed)
