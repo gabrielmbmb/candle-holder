@@ -3,29 +3,39 @@ use hf_hub::api::sync::ApiError;
 // `candle-holder` main error type
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
+    // -----------------------------------
     // Load model errors
+    // -----------------------------------
     #[error("Model weights not found in the repo.")]
     ModelWeightsNotFound,
 
+    // -----------------------------------
     // Load tokenizer errors
+    // -----------------------------------
     #[error("Tokenizer configuration is missing. Check the repository contains a `tokenizer_config.json` file.")]
     TokenizerMissingConfig,
 
     #[error("Tokenizer build error: {0}")]
     TokenizerBuildError(String),
 
+    // -----------------------------------
     // Special tokens errors
+    // -----------------------------------
     #[error("Missing the special token `{0}`.")]
     MissingSpecialToken(String),
 
     #[error("Missing the id of the special token `{0}`.")]
     MissingSpecialTokenId(String),
 
+    // -----------------------------------
     // Tokenizer encoding errors
+    // -----------------------------------
     #[error("Tokenizer encoding error: {0}.")]
     TokenizerEncodingError(String),
 
+    // -----------------------------------
     // `forward` method errors
+    // -----------------------------------
     #[error("Forward param {0} cannot be `None`.")]
     MissingForwardParam(String),
 

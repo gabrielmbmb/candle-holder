@@ -1,7 +1,7 @@
 use candle_core::{IndexOp, Tensor};
 use candle_holder::{Error, Result};
 
-use super::sampling::LogitSampler;
+use super::{sampling::LogitSampler, token_streamer::TokenStreamer};
 use crate::{config::GenerationConfig, utils::cache::DynamicCache, ForwardParams, PreTrainedModel};
 
 /// Generates a completion of the input sequences using the provided `model`.
@@ -16,10 +16,11 @@ use crate::{config::GenerationConfig, utils::cache::DynamicCache, ForwardParams,
 /// # Returns
 ///
 /// A vector containing vectors of token ids for each input sequence.
-pub fn generate<M: PreTrainedModel + ?Sized>(
+pub fn generate<'a, M: PreTrainedModel + ?Sized>(
     model: &M,
     input_ids: &Tensor,
     generation_config: GenerationConfig,
+    mut token_streamer: Option<Box<dyn TokenStreamer<'a> + 'a>>,
     seed: Option<u64>,
 ) -> Result<Vec<Vec<u32>>> {
     let mut output = input_ids.to_vec2::<u32>()?;
@@ -51,6 +52,7 @@ pub fn generate<M: PreTrainedModel + ?Sized>(
 
     // TODO: if `generation_config.num_return_sequences>1` then we need to expand the
     // `input_ids` tensor to have `num_return_sequences` times the number of sequences
+    stream_tokens(&mut token_streamer, input_ids.to_vec2::<u32>()?)?;
 
     // Generation loop
     for _ in 0..max_new_tokens {
@@ -81,6 +83,15 @@ pub fn generate<M: PreTrainedModel + ?Sized>(
             }
         }
 
+        stream_tokens(
+            &mut token_streamer,
+            // Gather last token generated for each sequence
+            sequences_next_tokens
+                .iter()
+                .map(|inner_vec| inner_vec.last().map_or(Vec::new(), |&last| vec![last]))
+                .collect(),
+        )?;
+
         // Build the next `input_ids` vectors with the last token of each sequence
         let sequences_last_tokens = sequences_next_tokens
             .iter()
@@ -94,4 +105,14 @@ pub fn generate<M: PreTrainedModel + ?Sized>(
         output[i].extend(seq);
     }
     Ok(output)
+}
+
+fn stream_tokens(
+    token_streamer: &mut Option<Box<dyn TokenStreamer + '_>>,
+    tokens: Vec<Vec<u32>>,
+) -> Result<()> {
+    if let Some(streamer) = token_streamer.as_mut() {
+        streamer.put(tokens)?;
+    }
+    Ok(())
 }

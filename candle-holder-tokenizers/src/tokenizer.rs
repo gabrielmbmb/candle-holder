@@ -79,6 +79,7 @@ impl Default for PaddingOptions {
 pub trait Tokenizer: std::fmt::Debug {
     fn get_tokenizer(&self) -> &CoreTokenizer;
 
+    // TODO: can we use `Arc` so we don't need to clone it?
     fn get_tokenizer_with_padding(&self, padding: PaddingOptions) -> Result<CoreTokenizer> {
         let pad_token = self
             .get_pad_token()
