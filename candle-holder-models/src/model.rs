@@ -5,6 +5,7 @@ use candle_nn::VarBuilder;
 use crate::config::{GenerationConfig, PretrainedConfig};
 use crate::from_pretrained::from_pretrained;
 use crate::generation::generate::generate;
+use crate::generation::token_streamer::TokenStreamer;
 use crate::models::bert::{
     BertForMaskedLM, BertForSequenceClassification, BertForTokenClassification, BertModel,
     BERT_DTYPE,
@@ -112,15 +113,16 @@ pub trait PreTrainedModel {
     /// # Returns
     ///
     /// A vector containing vectors of token ids for each input sequence.
-    fn generate(
+    fn generate<'a>(
         &self,
         input_ids: &Tensor,
         generation_config: Option<GenerationConfig>,
+        token_streamer: Option<Box<dyn TokenStreamer<'a> + 'a>>,
         seed: Option<u64>,
     ) -> Result<Vec<Vec<u32>>> {
         let generation_config =
             generation_config.unwrap_or_else(|| self.get_generation_config().clone());
-        generate(self, input_ids, generation_config, seed)
+        generate(self, input_ids, generation_config, token_streamer, seed)
     }
 }
 

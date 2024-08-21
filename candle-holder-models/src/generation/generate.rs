@@ -52,7 +52,7 @@ pub fn generate<'a, M: PreTrainedModel + ?Sized>(
 
     // TODO: if `generation_config.num_return_sequences>1` then we need to expand the
     // `input_ids` tensor to have `num_return_sequences` times the number of sequences
-    stream_tokens(&mut token_streamer, input_ids.to_vec2::<u32>()?)?;
+    stream_tokens(&mut token_streamer, &input_ids.to_vec2::<u32>()?)?;
 
     // Generation loop
     for _ in 0..max_new_tokens {
@@ -83,22 +83,19 @@ pub fn generate<'a, M: PreTrainedModel + ?Sized>(
             }
         }
 
-        stream_tokens(
-            &mut token_streamer,
-            // Gather last token generated for each sequence
-            sequences_next_tokens
-                .iter()
-                .map(|inner_vec| inner_vec.last().map_or(Vec::new(), |&last| vec![last]))
-                .collect(),
-        )?;
+        let sequences_last_tokens: Vec<Vec<u32>> = sequences_next_tokens
+            .iter()
+            .map(|inner_vec| inner_vec.last().map_or(Vec::new(), |&last| vec![last]))
+            .collect();
+
+        stream_tokens(&mut token_streamer, &sequences_last_tokens)?;
 
         // Build the next `input_ids` vectors with the last token of each sequence
-        let sequences_last_tokens = sequences_next_tokens
-            .iter()
-            .map(|seq| seq.last().unwrap().clone())
-            .collect::<Vec<_>>();
+        let sequences_last_tokens: Vec<u32> = sequences_last_tokens.into_iter().flatten().collect();
         input_ids = Tensor::new(&sequences_last_tokens[..], input_ids.device())?.unsqueeze(0)?;
     }
+
+    stream_end(&mut token_streamer)?;
 
     // Append the generated sequences to the input sequences
     for (i, seq) in sequences_next_tokens.iter().enumerate() {
@@ -109,10 +106,17 @@ pub fn generate<'a, M: PreTrainedModel + ?Sized>(
 
 fn stream_tokens(
     token_streamer: &mut Option<Box<dyn TokenStreamer + '_>>,
-    tokens: Vec<Vec<u32>>,
+    tokens: &[Vec<u32>],
 ) -> Result<()> {
     if let Some(streamer) = token_streamer.as_mut() {
         streamer.put(tokens)?;
+    }
+    Ok(())
+}
+
+fn stream_end(token_streamer: &mut Option<Box<dyn TokenStreamer + '_>>) -> Result<()> {
+    if let Some(streamer) = token_streamer.as_mut() {
+        streamer.end()?;
     }
     Ok(())
 }
