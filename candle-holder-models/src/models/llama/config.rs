@@ -1,26 +1,12 @@
-use std::collections::HashMap;
-
 use serde::{Deserialize, Serialize};
 
 use crate::config::PretrainedConfig;
+use crate::utils::rope::RopeScaling;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum HiddenAct {
     Silu,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum RopeScalingStrategy {
-    Linear,
-    Dynamic,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RopeScaling {
-    pub strategy: RopeScalingStrategy,
-    pub factor: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,7 +25,7 @@ pub struct LlamaConfig {
     pub pretraining_tp: Option<usize>,
     pub tie_word_embeddings: Option<bool>,
     pub rope_theta: Option<f32>,
-    pub rope_scaling: Option<HashMap<usize, f64>>,
+    pub rope_scaling: Option<RopeScaling>,
     pub attention_bias: Option<bool>,
     pub attention_dropout: Option<f32>,
 

@@ -23,17 +23,22 @@ pub const LLAMA_DTYPE: DType = DType::F16;
 
 pub struct LlamaRotaryEmbedding {
     inv_freq: Tensor,
+    scaling_factor: Option<f64>,
 }
 
 impl LlamaRotaryEmbedding {
-    fn new(dim: usize, base: f32, device: &Device) -> Result<Self> {
-        let inv_freq: Vec<_> = (0..dim)
-            .step_by(2)
-            .map(|i| 1f32 / base.powf(i as f32 / dim as f32))
-            .collect();
-        let inv_freq = Tensor::new(inv_freq.as_slice(), device)?;
+    fn new(config: &LlamaConfig, device: &Device) -> Result<Self> {
+        let rope_scaling = config.rope_scaling.clone().unwrap_or_default();
+        let (inv_freq, scaling_factor) = rope_scaling.compute_rope_parameters(
+            config.hidden_size / config.num_attention_heads,
+            config.rope_theta.unwrap_or_default(),
+            device,
+        )?;
 
-        Ok(Self { inv_freq })
+        Ok(Self {
+            inv_freq,
+            scaling_factor,
+        })
     }
 
     fn apply_rotary_pos_emb(
@@ -49,8 +54,12 @@ impl LlamaRotaryEmbedding {
             .transpose(1, 2)?
             .squeeze(0)?;
         let dtype = q.dtype();
-        let cos = emb.cos()?.to_dtype(dtype)?;
-        let sin = emb.sin()?.to_dtype(dtype)?;
+        let mut cos = emb.cos()?.to_dtype(dtype)?;
+        let mut sin = emb.sin()?.to_dtype(dtype)?;
+        if let Some(scaling_factor) = self.scaling_factor {
+            cos = (cos * scaling_factor)?;
+            sin = (sin * scaling_factor)?;
+        }
         let q_embed = rope(q, &cos, &sin)?;
         let k_embed = rope(k, &cos, &sin)?;
         Ok((q_embed, k_embed))
@@ -314,11 +323,7 @@ impl Llama {
     fn load(vb: VarBuilder, config: &LlamaConfig) -> Result<Self> {
         let embed_tokens: Embedding =
             embedding(config.vocab_size, config.hidden_size, vb.pp("embed_tokens"))?;
-        let rotary_emb = Arc::new(LlamaRotaryEmbedding::new(
-            config.hidden_size / config.num_attention_heads,
-            config.rope_theta.unwrap_or_default(),
-            vb.device(),
-        )?);
+        let rotary_emb = Arc::new(LlamaRotaryEmbedding::new(config, vb.device())?);
         let norm = rms_norm(config.hidden_size, config.rms_norm_eps, vb.pp("norm"))?;
         let layers = (0..config.num_hidden_layers)
             .map(|index| {
