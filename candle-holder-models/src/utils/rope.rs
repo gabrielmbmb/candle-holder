@@ -1,5 +1,7 @@
+use std::f64::consts::PI;
+
 use candle_core::{Device, Tensor};
-use candle_holder::Result;
+use candle_holder::{Error, Result};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -91,33 +93,33 @@ impl RopeScaling {
     }
     fn compute_linear_parameters(
         &self,
-        dim: usize,
-        base: f32,
-        device: &Device,
+        _dim: usize,
+        _base: f32,
+        _device: &Device,
     ) -> Result<(Tensor, Option<f64>)> {
         unimplemented!("Computing linear RoPE parameters is not implemented")
     }
     fn compute_dynamic_parameters(
         &self,
-        dim: usize,
-        base: f32,
-        device: &Device,
+        _dim: usize,
+        _base: f32,
+        _device: &Device,
     ) -> Result<(Tensor, Option<f64>)> {
         unimplemented!("Computing dynamic RoPE parameters is not implemented")
     }
     fn compute_yarn_parameters(
         &self,
-        dim: usize,
-        base: f32,
-        device: &Device,
+        _dim: usize,
+        _base: f32,
+        _device: &Device,
     ) -> Result<(Tensor, Option<f64>)> {
         unimplemented!("Computing yarn RoPE parameters is not implemented")
     }
     fn compute_long_rope_parameters(
         &self,
-        dim: usize,
-        base: f32,
-        device: &Device,
+        _dim: usize,
+        _base: f32,
+        _device: &Device,
     ) -> Result<(Tensor, Option<f64>)> {
         unimplemented!("Computing long RoPE parameters is not implemented")
     }
@@ -128,6 +130,37 @@ impl RopeScaling {
         base: f32,
         device: &Device,
     ) -> Result<(Tensor, Option<f64>)> {
-        unimplemented!("Computing llama3 RoPE parameters is not implemented")
+        let factor = self
+            .factor
+            .ok_or(Error::MissingRopeParam("factor".to_string()))?;
+        let low_freq_factor = self
+            .low_freq_factor
+            .ok_or(Error::MissingRopeParam("low_freq_factor".to_string()))?;
+        let high_freq_factor = self
+            .high_freq_factor
+            .ok_or(Error::MissingRopeParam("high_freq_factor".to_string()))?;
+        let original_max_position_embeddings =
+            self.original_max_position_embeddings
+                .ok_or(Error::MissingRopeParam(
+                    "original_max_position_embeddings".to_string(),
+                ))? as f64;
+
+        let (inv_freqs, scaling_factor) = self.compute_default_parameters(dim, base, device)?;
+        let low_freq_wavelen = original_max_position_embeddings / low_freq_factor;
+        let inv_freqs_scaled = (&inv_freqs / factor)?;
+        let high_freq_wavelen = original_max_position_embeddings / high_freq_factor;
+        let wavelen = ((2.0 * PI) * &inv_freqs)?;
+        let inv_freq_llama = wavelen
+            .gt(low_freq_wavelen)?
+            .where_cond(&inv_freqs_scaled, &inv_freqs)?;
+        let smooth_factor = (((original_max_position_embeddings / &wavelen)? - low_freq_factor)?
+            / (high_freq_factor - low_freq_factor))?;
+        let smoothed_inv_freq = ((1f64 - &smooth_factor)?.mul(&inv_freq_llama)?
+            / (factor + &smooth_factor)?.mul(&inv_freq_llama)?)?;
+        let is_medium_freq = wavelen
+            .ge(high_freq_wavelen)?
+            .mul(&wavelen.le(low_freq_wavelen)?)?;
+        let inv_freq_llama = is_medium_freq.where_cond(&smoothed_inv_freq, &inv_freq_llama)?;
+        Ok((inv_freq_llama, scaling_factor))
     }
 }
