@@ -17,10 +17,14 @@ candle-holder-tokenizers = { path = "../candle-holder-tokenizers", version = "0.
 candle-holder-pipelines = { path = "../candle-holder-pipelines", version = "0.1.0" }
 candle-core = { workspace = true }
 candle-nn = { workspace = true }
+accelerate-src = { workspace = true, optional = true }
+intel-mkl-src = { workspace = true, optional = true }
 anyhow = "1.0.86"
 
 [features]
 metal = ["candle-core/metal", "candle-holder-models/metal"]
 cuda = ["candle-core/cuda", "candle-holder-models/cuda"]
-cudnn = ["candle-holder-models/cudnn"]
+cudnn = ["candle-core/cudnn", "candle-holder-models/cudnn"]
+accelerate = ["dep:accelerate-src", "candle-holder-models/accelerate"]
+mkl = ["dep:intel-mkl-src", "candle-holder-models/mkl"]
 flash-attn = ["candle-holder-models/flash-attn"]
