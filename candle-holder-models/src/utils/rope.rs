@@ -149,7 +149,7 @@ impl RopeScaling {
         let low_freq_wavelen = original_max_position_embeddings / low_freq_factor;
         let inv_freqs_scaled = (&inv_freqs / factor)?;
         let high_freq_wavelen = original_max_position_embeddings / high_freq_factor;
-        let wavelen = ((2.0 * PI) * &inv_freqs)?;
+        let wavelen = ((2.0 * PI) / &inv_freqs)?;
         let inv_freq_llama = wavelen
             .gt(low_freq_wavelen)?
             .where_cond(&inv_freqs_scaled, &inv_freqs)?;
