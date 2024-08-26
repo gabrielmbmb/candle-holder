@@ -42,6 +42,12 @@ pub enum Error {
     #[error("{0}")]
     Msg(String),
 
+    // -----------------------------------
+    // RoPE errors
+    // -----------------------------------
+    #[error("RoPE param {0} cannot be `None`.")]
+    MissingRopeParam(String),
+
     // Wrapped errors from other crates
     #[error(transparent)]
     Wrapped(Box<dyn std::error::Error + Send + Sync>),
