@@ -4,7 +4,10 @@ use candle_holder::{Error, Result};
 use super::{
     penalties::apply_repetition_penalty, sampling::LogitSampler, token_streamer::TokenStreamer,
 };
-use crate::{config::GenerationConfig, utils::cache::DynamicCache, ForwardParams, PreTrainedModel};
+use crate::{
+    generation::config::GenerationConfig, utils::cache::DynamicCache, ForwardParams,
+    PreTrainedModel,
+};
 
 /// Generates a completion of the input sequences using the provided `model`.
 ///

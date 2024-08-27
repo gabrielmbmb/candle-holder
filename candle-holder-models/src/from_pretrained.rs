@@ -17,7 +17,7 @@ use candle_holder::{
     Error, Result,
 };
 
-use crate::config::GenerationConfig;
+use crate::generation::config::GenerationConfig;
 
 const MODEL_GENERATION_CONFIG_FILE: &str = "generation_config.json";
 const MODEL_SAFETENSORS_INDEX_FILE: &str = "model.safetensors.index.json";

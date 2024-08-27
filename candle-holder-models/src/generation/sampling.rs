@@ -4,7 +4,7 @@ use candle_nn::ops::softmax_last_dim;
 use rand::{distributions::WeightedIndex, prelude::Distribution, SeedableRng};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::config::GenerationConfig;
+use crate::generation::config::GenerationConfig;
 
 /// An enum containing the available sampling strategies for selecting the next token id of a
 /// sequence using the outputs logits of an auto-regressive model.

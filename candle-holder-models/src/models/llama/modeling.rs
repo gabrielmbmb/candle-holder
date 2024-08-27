@@ -8,7 +8,8 @@ use candle_nn::{
 };
 
 use crate::{
-    config::{GenerationConfig, PretrainedConfig},
+    config::PretrainedConfig,
+    generation::config::GenerationConfig,
     model::{ForwardParams, PreTrainedModel},
     utils::{
         attn_mask::{prepare_4d_causal_attention_mask, repeat_kv},

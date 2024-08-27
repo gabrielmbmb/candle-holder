@@ -2,8 +2,9 @@ use candle_core::{DType, Device, Tensor};
 use candle_holder::{bail, utils::FromPretrainedParameters, Result};
 use candle_nn::VarBuilder;
 
-use crate::config::{GenerationConfig, PretrainedConfig};
+use crate::config::PretrainedConfig;
 use crate::from_pretrained::from_pretrained;
+use crate::generation::config::GenerationConfig;
 use crate::generation::generate::generate;
 use crate::generation::token_streamer::TokenStreamer;
 use crate::models::bert::{
