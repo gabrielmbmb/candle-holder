@@ -29,11 +29,48 @@ pub struct PretrainedConfig {
     #[serde(default, deserialize_with = "deserialize_id2label")]
     id2label: Option<HashMap<usize, String>>,
     /// The ID of the PAD token.
-    pad_token_id: Option<u32>,
+    #[serde(default, deserialize_with = "deserialize_token_id")]
+    pad_token_id: Option<Vec<u32>>,
     /// The ID of the BOS token.
-    bos_token_id: Option<u32>,
+    #[serde(default, deserialize_with = "deserialize_token_id")]
+    bos_token_id: Option<Vec<u32>>,
     /// The ID of the EOS token.
-    eos_token_id: Option<u32>,
+    #[serde(default, deserialize_with = "deserialize_token_id")]
+    eos_token_id: Option<Vec<u32>>,
+}
+
+fn deserialize_token_id<'de, D>(deserializer: D) -> Result<Option<Vec<u32>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value: serde_json::Value = Deserialize::deserialize(deserializer)?;
+    match value {
+        serde_json::Value::Number(n) => n
+            .as_u64()
+            .and_then(|x| u32::try_from(x).ok())
+            .map(|x| Ok(Some(vec![x])))
+            .unwrap_or_else(|| Err(serde::de::Error::custom("Number not valid for u32"))),
+        serde_json::Value::Array(arr) => {
+            if arr.is_empty() {
+                Ok(None)
+            } else {
+                arr.into_iter()
+                    .map(|v| {
+                        v.as_u64()
+                            .and_then(|x| u32::try_from(x).ok())
+                            .ok_or_else(|| {
+                                serde::de::Error::custom("Expected an array of u32 numbers")
+                            })
+                    })
+                    .collect::<Result<Vec<u32>, _>>()
+                    .map(Some)
+            }
+        }
+        serde_json::Value::Null => Ok(None),
+        _ => Err(serde::de::Error::custom(
+            "Expected a number, an array of numbers, or null",
+        )),
+    }
 }
 
 impl PretrainedConfig {
@@ -45,16 +82,16 @@ impl PretrainedConfig {
         self.id2label.as_ref()
     }
 
-    pub fn get_pad_token_id(&self) -> Option<u32> {
-        self.pad_token_id
+    pub fn get_pad_token_id(&self) -> Option<&Vec<u32>> {
+        self.pad_token_id.as_ref()
     }
 
-    pub fn get_bos_token_id(&self) -> Option<u32> {
-        self.bos_token_id
+    pub fn get_bos_token_id(&self) -> Option<&Vec<u32>> {
+        self.bos_token_id.as_ref()
     }
 
-    pub fn get_eos_token_id(&self) -> Option<u32> {
-        self.eos_token_id
+    pub fn get_eos_token_id(&self) -> Option<&Vec<u32>> {
+        self.eos_token_id.as_ref()
     }
 }
 

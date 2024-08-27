@@ -207,9 +207,9 @@ macro_rules! impl_auto_model_from_pretrained_method {
                             let dtype = dtype.unwrap_or($default_dtype);
                             let vb = model_info.get_var_builder(dtype, device)?;
                             if $load_generation_config {
-                                Ok(Box::new($model_struct::load(vb, config)?))
-                            } else {
                                 Ok(Box::new($model_struct::load_with_generation_config(vb, config, model_info.get_generation_config().cloned())?))
+                            } else {
+                                Ok(Box::new($model_struct::load(vb, config)?))
                             }
                         },
                     )*

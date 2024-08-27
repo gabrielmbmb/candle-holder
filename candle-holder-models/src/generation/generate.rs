@@ -96,7 +96,7 @@ pub fn generate<'a, M: PreTrainedModel + ?Sized>(
             sequences_next_tokens[i].push(next_token_id);
 
             // TODO: check for other stop conditions
-            if next_token_id == eos_token_id {
+            if eos_token_id.contains(&next_token_id) {
                 active_sequences -= 1;
             }
         }
