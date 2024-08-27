@@ -19,7 +19,6 @@ pub struct GenerationConfig {
     /// The maximum number of tokens the sequence can have. Corresponds to the number of input
     /// tokens + `max_new_tokens` that will be generated. Its effect is overriden if
     /// `max_new_tokens` is set. The default is `20`.
-    #[serde(default)]
     pub max_length: usize,
     /// The maximun number of tokens to generate.
     pub max_new_tokens: Option<usize>,
