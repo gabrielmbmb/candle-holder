@@ -55,7 +55,7 @@ impl LogitSampler {
     /// # Returns
     ///
     /// A new `LogitSampler` instance.
-    pub fn from_generation_config(generation_config: GenerationConfig, seed: Option<u64>) -> Self {
+    pub fn from_generation_config(generation_config: &GenerationConfig, seed: Option<u64>) -> Self {
         let rng = Self::build_rng_from_seed(seed);
 
         if !generation_config.get_do_sample() {

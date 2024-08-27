@@ -1,7 +1,9 @@
 use candle_core::{IndexOp, Tensor};
 use candle_holder::{Error, Result};
 
-use super::{sampling::LogitSampler, token_streamer::TokenStreamer};
+use super::{
+    penalties::apply_repetition_penalty, sampling::LogitSampler, token_streamer::TokenStreamer,
+};
 use crate::{config::GenerationConfig, utils::cache::DynamicCache, ForwardParams, PreTrainedModel};
 
 /// Generates a completion of the input sequences using the provided `model`.
@@ -19,7 +21,7 @@ use crate::{config::GenerationConfig, utils::cache::DynamicCache, ForwardParams,
 pub fn generate<'a, M: PreTrainedModel + ?Sized>(
     model: &M,
     input_ids: &Tensor,
-    generation_config: GenerationConfig,
+    generation_config: &GenerationConfig,
     mut token_streamer: Option<Box<dyn TokenStreamer<'a> + 'a>>,
     seed: Option<u64>,
 ) -> Result<Vec<Vec<u32>>> {
@@ -38,7 +40,9 @@ pub fn generate<'a, M: PreTrainedModel + ?Sized>(
     } else {
         None
     };
+
     let mut sampling_config = LogitSampler::from_generation_config(generation_config, seed);
+
     // TODO: update to try to get from generation config first before failing
     let eos_token_id = model
         .get_config()
@@ -73,7 +77,18 @@ pub fn generate<'a, M: PreTrainedModel + ?Sized>(
 
         // Sample the next token for each sequence
         for i in 0..dims.0 {
-            let seq_logits = last_token_logits.i((i, ..))?;
+            let mut seq_logits = last_token_logits.i((i, ..))?;
+
+            // Apply penalties
+            if let Some(repetion_penalty) = generation_config.get_repetition_penalty() {
+                seq_logits = apply_repetition_penalty(
+                    &seq_logits,
+                    &input_ids.i((i, ..))?,
+                    repetion_penalty,
+                )?;
+            }
+
+            // Sample next token
             let next_token_id = sampling_config.sample(&seq_logits)?;
             sequences_next_tokens[i].push(next_token_id);
 

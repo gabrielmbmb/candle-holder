@@ -122,7 +122,7 @@ pub trait PreTrainedModel {
     ) -> Result<Vec<Vec<u32>>> {
         let generation_config =
             generation_config.unwrap_or_else(|| self.get_generation_config().clone());
-        generate(self, input_ids, generation_config, token_streamer, seed)
+        generate(self, input_ids, &generation_config, token_streamer, seed)
     }
 }
 

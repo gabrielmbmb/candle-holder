@@ -138,13 +138,6 @@ pub struct GenerationConfig {
     /// is `false`.
     #[serde(default)]
     pub do_sample: bool,
-    /// Number of beams for beam search. `1` means no beam search. The default is `1`.
-    #[serde(default)]
-    pub num_beams: usize,
-    /// Number of groups to divide `num_beams`
-    #[serde(default)]
-    pub num_beam_groups: usize,
-    pub penalty_alpha: Option<f64>,
     /// Whether the model should use the past key/values attentions to speed up decoding.
     #[serde(default)]
     pub use_cache: bool,
@@ -158,6 +151,11 @@ pub struct GenerationConfig {
     /// The cumulative probability threshold for nucleus sampling. The default is `1.0`.
     #[serde(default)]
     pub top_p: Option<f32>,
+    /// The value to modulate the logits of tokens that have already appeared in the sequence to
+    /// reduce the probability of them being selected again. Valid values are in the range of
+    /// `0.0` to `infinity`. A value of `1.0` means no penalty. The default is `1.0`.
+    #[serde(default)]
+    pub repetition_penalty: Option<f64>,
 }
 
 impl GenerationConfig {
@@ -188,6 +186,10 @@ impl GenerationConfig {
     pub fn get_top_p(&self) -> Option<f32> {
         self.top_p
     }
+
+    pub fn get_repetition_penalty(&self) -> Option<f64> {
+        self.repetition_penalty
+    }
 }
 
 impl Default for GenerationConfig {
@@ -200,13 +202,11 @@ impl Default for GenerationConfig {
             max_time: None,
             stop_strings: None,
             do_sample: false,
-            num_beams: 1,
-            num_beam_groups: 1,
-            penalty_alpha: None,
             use_cache: true,
             temperature: 1.0,
             top_k: Some(50),
             top_p: Some(1.0),
+            repetition_penalty: Some(1.0),
         }
     }
 }
