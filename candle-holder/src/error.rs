@@ -1,4 +1,24 @@
+use backtrace::Backtrace;
 use hf_hub::api::sync::ApiError;
+use std::fmt;
+
+#[derive(Debug)]
+pub struct WrappedError {
+    pub error: Box<dyn std::error::Error + Send + Sync>,
+    pub backtrace: Backtrace,
+}
+
+impl fmt::Display for WrappedError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.error)
+    }
+}
+
+impl std::error::Error for WrappedError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(self.error.as_ref())
+    }
+}
 
 // `candle-holder` main error type
 #[derive(thiserror::Error, Debug)]
@@ -39,6 +59,12 @@ pub enum Error {
     #[error("Forward param {0} cannot be `None`.")]
     MissingForwardParam(String),
 
+    // -----------------------------------
+    // `generate` method errors
+    // -----------------------------------
+    #[error("Generate param {0} cannot be `None`.{1}")]
+    MissingGenerateParam(String, String),
+
     #[error("{0}")]
     Msg(String),
 
@@ -50,12 +76,15 @@ pub enum Error {
 
     // Wrapped errors from other crates
     #[error(transparent)]
-    Wrapped(Box<dyn std::error::Error + Send + Sync>),
+    Wrapped(#[from] WrappedError),
 }
 
 impl Error {
     pub fn wrap(e: impl std::error::Error + Send + Sync + 'static) -> Self {
-        Error::Wrapped(Box::new(e))
+        Error::Wrapped(WrappedError {
+            error: Box::new(e),
+            backtrace: Backtrace::new(),
+        })
     }
 
     pub fn msg<T: std::fmt::Display>(msg: T) -> Self {
@@ -65,25 +94,25 @@ impl Error {
 
 impl From<candle_core::Error> for Error {
     fn from(e: candle_core::Error) -> Self {
-        Error::Msg(e.to_string())
+        Error::wrap(e)
     }
 }
 
 impl From<serde_json::Error> for Error {
     fn from(e: serde_json::Error) -> Self {
-        Error::Msg(e.to_string())
+        Error::wrap(e)
     }
 }
 
 impl From<ApiError> for Error {
     fn from(e: ApiError) -> Self {
-        Error::Msg(e.to_string())
+        Error::wrap(e)
     }
 }
 
 impl From<std::io::Error> for Error {
     fn from(e: std::io::Error) -> Self {
-        Error::Msg(e.to_string())
+        Error::wrap(e)
     }
 }
 
@@ -92,6 +121,6 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[macro_export]
 macro_rules! bail {
     ($msg:expr) => {
-        return Err($crate::error::Error::Msg($msg.into()))
+        return Err($crate::error::Error::msg($msg))
     };
 }

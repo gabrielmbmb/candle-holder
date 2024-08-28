@@ -9,7 +9,9 @@ license.workspace = true
 readme = "README.md"
 
 [dependencies]
+backtrace = "0.3.73"
 candle-core = { workspace = true }
 hf-hub = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
