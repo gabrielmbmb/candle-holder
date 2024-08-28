@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fs};
 
 use candle_holder::{
-    utils::{load_model_config, FromPretrainedParameters, MODEL_CONFIG_FILE},
+    utils::from_pretrained::{load_model_config, FromPretrainedParameters, MODEL_CONFIG_FILE},
     Result,
 };
 use hf_hub::{api::sync::Api, Repo, RepoType};

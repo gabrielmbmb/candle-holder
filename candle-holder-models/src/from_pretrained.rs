@@ -13,7 +13,7 @@ use hf_hub::{
 use serde::{Deserialize, Serialize};
 
 use candle_holder::{
-    utils::{load_model_config, FromPretrainedParameters, MODEL_CONFIG_FILE},
+    utils::from_pretrained::{load_model_config, FromPretrainedParameters, MODEL_CONFIG_FILE},
     Error, Result,
 };
 

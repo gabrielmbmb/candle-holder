@@ -1,18 +1,21 @@
 use candle_core::{DType, Device, Tensor};
-use candle_holder::{bail, utils::FromPretrainedParameters, Result};
+use candle_holder::{bail, utils::from_pretrained::FromPretrainedParameters, Result};
+use candle_holder_tokenizers::Tokenizer;
 use candle_nn::VarBuilder;
 
-use crate::config::PretrainedConfig;
-use crate::from_pretrained::from_pretrained;
-use crate::generation::config::GenerationConfig;
-use crate::generation::generate::generate;
-use crate::generation::token_streamer::TokenStreamer;
-use crate::models::bert::{
-    BertForMaskedLM, BertForSequenceClassification, BertForTokenClassification, BertModel,
-    BERT_DTYPE,
+use crate::{
+    config::PretrainedConfig,
+    from_pretrained::from_pretrained,
+    generation::{config::GenerationConfig, generate::generate, StoppingCriteria, TokenStreamer},
+    models::{
+        bert::{
+            BertForMaskedLM, BertForSequenceClassification, BertForTokenClassification, BertModel,
+            BERT_DTYPE,
+        },
+        llama::modeling::{LlamaForCausalLM, LlamaModel, LLAMA_DTYPE},
+    },
+    utils::cache::DynamicCache,
 };
-use crate::models::llama::modeling::{LlamaForCausalLM, LlamaModel, LLAMA_DTYPE};
-use crate::utils::cache::DynamicCache;
 
 /// Parameters for the `forward` method of a `PreTrainedModel`.
 pub struct ForwardParams<'a> {
@@ -82,9 +85,33 @@ impl<'a> From<&'a candle_holder_tokenizers::BatchEncoding> for ForwardParams<'a>
 
 /// Trait for a pre-trained model.
 pub trait PreTrainedModel {
+    /// Loads a model from a `VarBuilder` containing the model's parameters and a model
+    /// configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `vb` - The `VarBuilder` containing the model's parameters.
+    /// * `config` - The model configuration.
+    ///
+    /// # Returns
+    ///
+    /// The loaded model.
     fn load(vb: VarBuilder, config: serde_json::Value) -> Result<Self>
     where
         Self: Sized;
+
+    /// Loads a model from a `VarBuilder` containing the model's parameters, a model configuration,
+    /// and a generation configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `vb` - The `VarBuilder` containing the model's parameters.
+    /// * `config` - The model configuration.
+    /// * `generation_config` - The generation configuration.
+    ///
+    /// # Returns
+    ///
+    /// The loaded model.
     fn load_with_generation_config(
         _vb: VarBuilder,
         _config: serde_json::Value,
@@ -95,10 +122,32 @@ pub trait PreTrainedModel {
     {
         unimplemented!("`load_with_generation_config` method not implemented for this model");
     }
+
+    /// Returns the model's configuration.
+    ///
+    /// # Returns
+    ///
+    /// The model's configuration
+    fn get_config(&self) -> &PretrainedConfig;
+
+    /// Returns the model's generation configuration
+    ///
+    /// # Returns
+    ///
+    /// The model's generation configuration
     fn get_generation_config(&self) -> &GenerationConfig {
         unimplemented!("`get_generation_config` method not implemented for this model");
     }
-    fn get_config(&self) -> &PretrainedConfig;
+
+    /// Runs the model forward pass.
+    ///
+    /// # Arguments
+    ///
+    /// * `params` - The parameters for the forward pass.
+    ///
+    /// # Returns
+    ///
+    /// The model output
     fn forward(&self, params: ForwardParams) -> Result<Tensor>;
 
     /// Generates a completion of the input sequences.
@@ -118,12 +167,22 @@ pub trait PreTrainedModel {
         &self,
         input_ids: &Tensor,
         generation_config: Option<GenerationConfig>,
+        tokenizer: Option<&Box<dyn Tokenizer>>,
+        stopping_criteria: Option<Vec<Box<dyn StoppingCriteria>>>,
         token_streamer: Option<Box<dyn TokenStreamer<'a> + 'a>>,
         seed: Option<u64>,
     ) -> Result<Vec<Vec<u32>>> {
         let generation_config =
             generation_config.unwrap_or_else(|| self.get_generation_config().clone());
-        generate(self, input_ids, &generation_config, token_streamer, seed)
+        generate(
+            self,
+            input_ids,
+            &generation_config,
+            tokenizer,
+            stopping_criteria,
+            token_streamer,
+            seed,
+        )
     }
 }
 

@@ -1,13 +1,12 @@
 use candle_core::{IndexOp, Tensor};
 use candle_holder::{Error, Result};
+use candle_holder_tokenizers::Tokenizer;
 
 use super::{
-    penalties::apply_repetition_penalty, sampling::LogitSampler, token_streamer::TokenStreamer,
+    penalties::apply_repetition_penalty, sampling::LogitSampler,
+    stopping_criteria::StoppingCriteriaApplier, GenerationConfig, StoppingCriteria, TokenStreamer,
 };
-use crate::{
-    generation::config::GenerationConfig, utils::cache::DynamicCache, ForwardParams,
-    PreTrainedModel,
-};
+use crate::{utils::cache::DynamicCache, ForwardParams, PreTrainedModel};
 
 /// Generates a completion of the input sequences using the provided `model`.
 ///
@@ -25,6 +24,8 @@ pub fn generate<'a, M: PreTrainedModel + ?Sized>(
     model: &M,
     input_ids: &Tensor,
     generation_config: &GenerationConfig,
+    tokenizer: Option<&Box<dyn Tokenizer>>,
+    stopping_criteria: Option<Vec<Box<dyn StoppingCriteria>>>,
     mut token_streamer: Option<Box<dyn TokenStreamer<'a> + 'a>>,
     seed: Option<u64>,
 ) -> Result<Vec<Vec<u32>>> {
@@ -44,6 +45,12 @@ pub fn generate<'a, M: PreTrainedModel + ?Sized>(
         None
     };
 
+    let stopping_criteria_applier = StoppingCriteriaApplier::from_configuration(
+        generation_config,
+        stopping_criteria,
+        tokenizer,
+    )?;
+
     let mut sampling_config = LogitSampler::from_generation_config(generation_config, seed);
 
     // TODO: update to try to get from generation config first before failing
@@ -54,7 +61,6 @@ pub fn generate<'a, M: PreTrainedModel + ?Sized>(
 
     // Initialize a vector to store the next token ids for each sequence
     let num_sequences = input_ids_dims.0;
-    let mut sequences_next_tokens: Vec<Vec<u32>> = vec![Vec::new(); num_sequences];
     let mut active_sequences = num_sequences;
 
     // TODO: if `generation_config.num_return_sequences>1` then we need to expand the
@@ -76,8 +82,6 @@ pub fn generate<'a, M: PreTrainedModel + ?Sized>(
 
         let last_token_logits = logits.i((.., dims.1 - 1, ..))?;
 
-        // TODO: apply repeat penalty, frequency penalty
-
         // Sample the next token for each sequence
         for i in 0..dims.0 {
             let mut seq_logits = last_token_logits.i((i, ..))?;
@@ -93,15 +97,17 @@ pub fn generate<'a, M: PreTrainedModel + ?Sized>(
 
             // Sample next token
             let next_token_id = sampling_config.sample(&seq_logits)?;
-            sequences_next_tokens[i].push(next_token_id);
+
+            // Update the sequences with the next token
+            output[i].push(next_token_id);
 
             // TODO: check for other stop conditions
-            if eos_token_id.contains(&next_token_id) {
+            if stopping_criteria_applier.should_stop(&output[i])? {
                 active_sequences -= 1;
             }
         }
 
-        let sequences_last_tokens: Vec<Vec<u32>> = sequences_next_tokens
+        let sequences_last_tokens: Vec<Vec<u32>> = output
             .iter()
             .map(|inner_vec| inner_vec.last().map_or(Vec::new(), |&last| vec![last]))
             .collect();
@@ -115,10 +121,6 @@ pub fn generate<'a, M: PreTrainedModel + ?Sized>(
 
     stream_end(&mut token_streamer)?;
 
-    // Append the generated sequences to the input sequences
-    for (i, seq) in sequences_next_tokens.iter().enumerate() {
-        output[i].extend(seq);
-    }
     Ok(output)
 }
 

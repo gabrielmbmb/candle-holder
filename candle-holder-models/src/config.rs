@@ -1,3 +1,4 @@
+use candle_holder::utils::serde::deserialize_single_or_vec;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 
@@ -29,70 +30,14 @@ pub struct PretrainedConfig {
     #[serde(default, deserialize_with = "deserialize_id2label")]
     id2label: Option<HashMap<usize, String>>,
     /// The ID of the PAD token.
-    #[serde(default, deserialize_with = "deserialize_token_id")]
-    pad_token_id: Option<Vec<u32>>,
+    #[serde(default)]
+    pad_token_id: Option<u32>,
     /// The ID of the BOS token.
-    #[serde(default, deserialize_with = "deserialize_token_id")]
-    bos_token_id: Option<Vec<u32>>,
-    /// The ID of the EOS token.
-    #[serde(default, deserialize_with = "deserialize_token_id")]
+    #[serde(default)]
+    bos_token_id: Option<u32>,
+    /// The IDs of the EOS tokens.
+    #[serde(default, deserialize_with = "deserialize_single_or_vec")]
     eos_token_id: Option<Vec<u32>>,
-}
-
-fn deserialize_token_id<'de, D>(deserializer: D) -> Result<Option<Vec<u32>>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let value: serde_json::Value = Deserialize::deserialize(deserializer)?;
-    match value {
-        serde_json::Value::Number(n) => n
-            .as_u64()
-            .and_then(|x| u32::try_from(x).ok())
-            .map(|x| Ok(Some(vec![x])))
-            .unwrap_or_else(|| Err(serde::de::Error::custom("Number not valid for u32"))),
-        serde_json::Value::Array(arr) => {
-            if arr.is_empty() {
-                Ok(None)
-            } else {
-                arr.into_iter()
-                    .map(|v| {
-                        v.as_u64()
-                            .and_then(|x| u32::try_from(x).ok())
-                            .ok_or_else(|| {
-                                serde::de::Error::custom("Expected an array of u32 numbers")
-                            })
-                    })
-                    .collect::<Result<Vec<u32>, _>>()
-                    .map(Some)
-            }
-        }
-        serde_json::Value::Null => Ok(None),
-        _ => Err(serde::de::Error::custom(
-            "Expected a number, an array of numbers, or null",
-        )),
-    }
-}
-
-impl PretrainedConfig {
-    pub fn get_problem_type(&self) -> &ProblemType {
-        &self.problem_type
-    }
-
-    pub fn get_id2label(&self) -> Option<&HashMap<usize, String>> {
-        self.id2label.as_ref()
-    }
-
-    pub fn get_pad_token_id(&self) -> Option<&Vec<u32>> {
-        self.pad_token_id.as_ref()
-    }
-
-    pub fn get_bos_token_id(&self) -> Option<&Vec<u32>> {
-        self.bos_token_id.as_ref()
-    }
-
-    pub fn get_eos_token_id(&self) -> Option<&Vec<u32>> {
-        self.eos_token_id.as_ref()
-    }
 }
 
 fn deserialize_id2label<'de, D>(deserializer: D) -> Result<Option<HashMap<usize, String>>, D::Error>
@@ -108,6 +53,28 @@ where
             })
             .collect::<HashMap<usize, String>>()
     }))
+}
+
+impl PretrainedConfig {
+    pub fn get_problem_type(&self) -> &ProblemType {
+        &self.problem_type
+    }
+
+    pub fn get_id2label(&self) -> Option<&HashMap<usize, String>> {
+        self.id2label.as_ref()
+    }
+
+    pub fn get_pad_token_id(&self) -> Option<u32> {
+        self.pad_token_id
+    }
+
+    pub fn get_bos_token_id(&self) -> Option<u32> {
+        self.bos_token_id
+    }
+
+    pub fn get_eos_token_id(&self) -> Option<&Vec<u32>> {
+        self.eos_token_id.as_ref()
+    }
 }
 
 impl PretrainedConfig {

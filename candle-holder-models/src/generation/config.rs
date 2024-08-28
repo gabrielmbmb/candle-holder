@@ -1,4 +1,5 @@
-use serde::{Deserialize, Serialize};
+use candle_holder::utils::serde::deserialize_single_or_vec;
+use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -25,18 +26,10 @@ pub struct GenerationConfig {
     /// The minimun number of tokens the sequence to be generated should have. Corresponds to the
     /// number of input tokens + `min_new_tokens` that will be generated.
     pub min_length: Option<usize>,
-    /// Controls the stopping condition for beam-based methods. It accepts the following values:
-    ///
-    /// - `True`: generation stops as soon as there are `num_beams` complete candidates.
-    /// - `False`: an heuristic is applied to determine if it's very unlikely to find better
-    /// candidates and the generation should stop.
-    /// - `"never"`: beam search only stops when there cannot be better candidates.
-    pub early_stopping: Option<EarlyStopping>,
-    /// The maximum amount of time that computation should be allowed to run in seconds.
-    pub max_time: Option<f64>,
     /// A string or a list of strings that should terminate the generation if the model outputs
     /// them.
-    pub stop_strings: Option<StopStrings>,
+    #[serde(deserialize_with = "deserialize_single_or_vec")]
+    pub stop_strings: Option<Vec<String>>,
     /// Whether or not to use sampling. If `false`, then greedy decoding will be used. The default
     /// is `false`.
     #[serde(default)]
@@ -59,6 +52,15 @@ pub struct GenerationConfig {
     /// `0.0` to `infinity`. A value of `1.0` means no penalty. The default is `1.0`.
     #[serde(default)]
     pub repetition_penalty: Option<f64>,
+    /// The ID of the PAD token.
+    #[serde(default)]
+    pub pad_token_id: Option<u32>,
+    /// The ID of the BOS token.
+    #[serde(default)]
+    pub bos_token_id: Option<u32>,
+    /// The IDs of the EOS tokens.
+    #[serde(default, deserialize_with = "deserialize_single_or_vec")]
+    pub eos_token_id: Option<Vec<u32>>,
 }
 
 impl GenerationConfig {
@@ -68,6 +70,14 @@ impl GenerationConfig {
 
     pub fn get_max_new_tokens(&self) -> Option<usize> {
         self.max_new_tokens
+    }
+
+    pub fn get_min_length(&self) -> Option<usize> {
+        self.min_length
+    }
+
+    pub fn get_stop_strings(&self) -> Option<&Vec<String>> {
+        self.stop_strings.as_ref()
     }
 
     pub fn get_do_sample(&self) -> bool {
@@ -93,6 +103,18 @@ impl GenerationConfig {
     pub fn get_repetition_penalty(&self) -> Option<f64> {
         self.repetition_penalty
     }
+
+    pub fn get_pad_token_id(&self) -> Option<u32> {
+        self.pad_token_id
+    }
+
+    pub fn get_bos_token_id(&self) -> Option<u32> {
+        self.bos_token_id
+    }
+
+    pub fn get_eos_token_id(&self) -> Option<&Vec<u32>> {
+        self.eos_token_id.as_ref()
+    }
 }
 
 impl Default for GenerationConfig {
@@ -101,8 +123,6 @@ impl Default for GenerationConfig {
             max_length: 20,
             max_new_tokens: None,
             min_length: None,
-            early_stopping: None,
-            max_time: None,
             stop_strings: None,
             do_sample: false,
             use_cache: true,
@@ -110,6 +130,9 @@ impl Default for GenerationConfig {
             top_k: Some(50),
             top_p: Some(1.0),
             repetition_penalty: Some(1.0),
+            pad_token_id: None,
+            bos_token_id: None,
+            eos_token_id: None,
         }
     }
 }
