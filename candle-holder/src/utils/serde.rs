@@ -2,6 +2,7 @@ use serde::{Deserialize, Deserializer};
 use std::fmt::Debug;
 use std::str::FromStr;
 
+/// Deserializes a single value or a vec of values.
 pub fn deserialize_single_or_vec<'de, D, T>(deserializer: D) -> Result<Option<Vec<T>>, D::Error>
 where
     D: Deserializer<'de>,

@@ -66,6 +66,9 @@ pub enum Error {
     MissingGenerateParam(String, String),
 
     #[error("{0}")]
+    GenerateParamValueError(String),
+
+    #[error("{0}")]
     Msg(String),
 
     // -----------------------------------

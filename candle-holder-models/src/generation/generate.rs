@@ -33,33 +33,37 @@ pub fn generate<'a, M: PreTrainedModel + ?Sized>(
     let mut input_ids = input_ids.clone();
     let input_ids_dims = input_ids.dims2()?;
 
+    if input_ids_dims.1.ge(&generation_config.get_max_length())
+        && generation_config.get_max_new_tokens().is_none()
+    {
+        return Err(Error::GenerateParamValueError(
+            "`max_length` must be greater than input sequence length.".to_string(),
+        ));
+    }
+
     // Calculate the number of max new tokens to be generated if `max_new_tokens` not provided
     let input_seq_len = input_ids.dims2()?.1;
     let max_new_tokens = generation_config
         .get_max_new_tokens()
         .unwrap_or_else(|| generation_config.get_max_length() - input_seq_len);
 
+    // Create a KV cache to accelerate generation of next tokens
     let mut cache = if generation_config.get_use_cache() {
         Some(DynamicCache::new())
     } else {
         None
     };
 
+    // TODO: refactor this into `LogitProcessor` trait
+    let mut sampling_config = LogitSampler::from_generation_config(generation_config, seed);
+
+    // Initialize the stopping criteria applier that will be used to determine when to stop
     let stopping_criteria_applier = StoppingCriteriaApplier::from_configuration(
         generation_config,
         stopping_criteria,
         tokenizer,
     )?;
 
-    let mut sampling_config = LogitSampler::from_generation_config(generation_config, seed);
-
-    // TODO: update to try to get from generation config first before failing
-    let eos_token_id = model
-        .get_config()
-        .get_eos_token_id()
-        .ok_or_else(|| Error::MissingSpecialTokenId("eos_token_id".to_string()))?;
-
-    // Initialize a vector to store the next token ids for each sequence
     let num_sequences = input_ids_dims.0;
     let mut active_sequences = num_sequences;
 
@@ -87,6 +91,7 @@ pub fn generate<'a, M: PreTrainedModel + ?Sized>(
             let mut seq_logits = last_token_logits.i((i, ..))?;
 
             // Apply penalties
+            // TODO: refactor this into `LogitProcessor` trait
             if let Some(repetion_penalty) = generation_config.get_repetition_penalty() {
                 seq_logits = apply_repetition_penalty(
                     &seq_logits,
@@ -101,7 +106,6 @@ pub fn generate<'a, M: PreTrainedModel + ?Sized>(
             // Update the sequences with the next token
             output[i].push(next_token_id);
 
-            // TODO: check for other stop conditions
             if stopping_criteria_applier.should_stop(&output[i])? {
                 active_sequences -= 1;
             }
