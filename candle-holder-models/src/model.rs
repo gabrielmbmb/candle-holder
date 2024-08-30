@@ -83,6 +83,37 @@ impl<'a> From<&'a candle_holder_tokenizers::BatchEncoding> for ForwardParams<'a>
     }
 }
 
+/// Parameters for the `generate` method of a `PreTrainedModel`.
+pub struct GenerationParams<'a> {
+    /// The generation configuration to use. If not provided, then the model's default generation
+    /// configuration in `generation_config.json` will be used. If that is not available, then
+    /// default generation configuration will be used. The default value is `None`.
+    pub generation_config: Option<GenerationConfig>,
+    /// The tokenizer to use for decoding the generated tokens. It's not extrictly required, but
+    /// some stopping criteria may depend on it. The default value is `None`.
+    pub tokenizer: Option<&'a Box<dyn Tokenizer>>,
+    /// The list of stopping criteria to use that will determine when to stop generating tokens.
+    /// The default value is `None`.
+    pub stopping_criteria: Option<Vec<Box<dyn StoppingCriteria>>>,
+    /// The token streamer which will receive the next tokens as they are being generated. The
+    /// default value is `None`.
+    pub token_streamer: Option<Box<dyn TokenStreamer<'a> + 'a>>,
+    /// A seed that will be used in the sampling of the next token. The default value is `None`.
+    pub seed: Option<u64>,
+}
+
+impl Default for GenerationParams<'_> {
+    fn default() -> Self {
+        Self {
+            generation_config: None,
+            tokenizer: None,
+            stopping_criteria: None,
+            token_streamer: None,
+            seed: None,
+        }
+    }
+}
+
 /// Trait for a pre-trained model.
 pub trait PreTrainedModel {
     /// Loads a model from a `VarBuilder` containing the model's parameters and a model
@@ -166,22 +197,19 @@ pub trait PreTrainedModel {
     fn generate<'a>(
         &self,
         input_ids: &Tensor,
-        generation_config: Option<GenerationConfig>,
-        tokenizer: Option<&Box<dyn Tokenizer>>,
-        stopping_criteria: Option<Vec<Box<dyn StoppingCriteria>>>,
-        token_streamer: Option<Box<dyn TokenStreamer<'a> + 'a>>,
-        seed: Option<u64>,
+        params: GenerationParams<'a>,
     ) -> Result<Vec<Vec<u32>>> {
-        let generation_config =
-            generation_config.unwrap_or_else(|| self.get_generation_config().clone());
+        let generation_config = params
+            .generation_config
+            .unwrap_or_else(|| self.get_generation_config().clone());
         generate(
             self,
             input_ids,
             &generation_config,
-            tokenizer,
-            stopping_criteria,
-            token_streamer,
-            seed,
+            params.tokenizer,
+            params.stopping_criteria,
+            params.token_streamer,
+            params.seed,
         )
     }
 }

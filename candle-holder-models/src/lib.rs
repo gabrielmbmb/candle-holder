@@ -9,7 +9,7 @@ pub use config::{PretrainedConfig, ProblemType};
 pub use generation::{GenerationConfig, TextStreamer, TokenStreamer};
 pub use model::{
     AutoModel, AutoModelForCausalLM, AutoModelForMaskedLM, AutoModelForSequenceClassification,
-    AutoModelForTokenClassification, ForwardParams, PreTrainedModel,
+    AutoModelForTokenClassification, ForwardParams, GenerationParams, PreTrainedModel,
 };
 
 // BERT
