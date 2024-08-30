@@ -11,6 +11,7 @@ resolver = "2"
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
+authors = ["Gabriel Martín Blázquez"]
 description = "transformers-like library for Rust using candle"
 keywords = ["nlp", "transformers", "rust", "candle"]
 categories = ["science"]
@@ -30,3 +31,5 @@ tokenizers = { version = "0.19.1", features = ["http"] }
 thiserror = "1.0.61"
 accelerate-src = { version = "0.3.2" }
 intel-mkl-src = { version = "0.8.1", features = ["mkl-static-lp64-iomp"] }
+minijinja = "2.2.0"
+minijinja-contrib = { version = "2.2.0", features = ["pycompat"] }

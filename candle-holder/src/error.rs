@@ -62,6 +62,12 @@ pub enum Error {
     TokenizerEncodingError(String),
 
     // -----------------------------------
+    // Chat template errors
+    // -----------------------------------
+    #[error("Tokenizer does not have a chat template.")]
+    MissingChatTemplate(String),
+
+    // -----------------------------------
     // `forward` method errors
     // -----------------------------------
     #[error("Forward param {0} cannot be `None`.")]

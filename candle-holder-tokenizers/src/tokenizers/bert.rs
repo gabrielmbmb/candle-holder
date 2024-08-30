@@ -4,14 +4,13 @@ use tokenizers::models::wordpiece::WordPiece;
 use tokenizers::normalizers::BertNormalizer;
 use tokenizers::{
     decoders::wordpiece::WordPiece as WordPieceDecoder, pre_tokenizers::bert::BertPreTokenizer,
-    processors::template::TemplateProcessing, Tokenizer as CoreTokenizer, TokenizerImpl,
+    processors::template::TemplateProcessing, TokenizerImpl,
 };
 
 use crate::config::TokenizerConfig;
 use crate::from_pretrained::TokenizerInfo;
 use crate::impl_tokenizer;
-use crate::tokenizer::PaddingSide;
-use crate::tokenizer::{Tokenizer, TokenizerBuilder};
+use crate::tokenizer::TokenizerBuilder;
 
 const BERT_MAX_LENGTH: usize = 512;
 const BERT_CLS_TOKEN: &str = "[CLS]";
@@ -33,6 +32,7 @@ pub struct BertTokenizer {
     pad_token: Option<String>,
     sep_token: Option<String>,
     unk_token: Option<String>,
+    chat_template: Option<ChatTemplate>,
 }
 
 impl_tokenizer!(BertTokenizer);
@@ -188,6 +188,7 @@ impl TokenizerBuilder<BertTokenizer> for BertTokenizerBuilder {
             pad_token: Some(pad_token),
             sep_token: Some(sep_token),
             unk_token: Some(unk_token),
+            chat_template: None,
         })
     }
 }

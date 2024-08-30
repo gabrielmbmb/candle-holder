@@ -48,6 +48,7 @@ pub struct TokenizerConfig {
     pub tokenize_chinese_charts: Option<bool>,
     pub tokenizer_class: Option<String>,
     pub unk_token: Option<String>,
+    pub chat_template: Option<String>,
 }
 
 impl TokenizerConfig {

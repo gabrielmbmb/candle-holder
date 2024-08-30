@@ -1,11 +1,6 @@
 use candle_holder::{Error, Result};
-use tokenizers::Tokenizer as CoreTokenizer;
 
-use crate::{
-    from_pretrained::TokenizerInfo,
-    impl_tokenizer,
-    tokenizer::{PaddingSide, Tokenizer, TokenizerBuilder},
-};
+use crate::{from_pretrained::TokenizerInfo, impl_tokenizer, tokenizer::TokenizerBuilder};
 
 const LLAMA_MAX_LENGTH: usize = 4096;
 const LLAMA_BOS_TOKEN: &str = "<s>";
@@ -24,6 +19,7 @@ pub struct LlamaTokenizer {
     pad_token: Option<String>,
     sep_token: Option<String>,
     unk_token: Option<String>,
+    chat_template: Option<ChatTemplate>,
 }
 
 impl_tokenizer!(LlamaTokenizer);
@@ -69,6 +65,14 @@ impl TokenizerBuilder<LlamaTokenizer> for LlamaTokenizerBuilder {
             .tokenizer_info
             .get_eos_token()
             .unwrap_or(LLAMA_EOS_TOKEN.to_string());
+        let chat_template = self
+            .tokenizer_info
+            .get_config()
+            .and_then(|config| config.chat_template.clone())
+            .map(|template| {
+                ChatTemplate::new(template, Some(bos_token.clone()), Some(eos_token.clone()))
+            })
+            .transpose()?;
 
         Ok(LlamaTokenizer {
             tokenizer,
@@ -81,6 +85,7 @@ impl TokenizerBuilder<LlamaTokenizer> for LlamaTokenizerBuilder {
             pad_token: Some(eos_token),
             sep_token: None,
             unk_token: None,
+            chat_template,
         })
     }
 }

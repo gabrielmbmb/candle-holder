@@ -2,14 +2,10 @@ use candle_holder::{Error, Result};
 use tokenizers::{
     models::bpe::{Merges, Vocab, BPE},
     processors::{byte_level::ByteLevel, roberta::RobertaProcessing},
-    NormalizerWrapper, Tokenizer as CoreTokenizer, TokenizerImpl,
+    NormalizerWrapper, TokenizerImpl,
 };
 
-use crate::{
-    from_pretrained::TokenizerInfo,
-    impl_tokenizer,
-    tokenizer::{PaddingSide, Tokenizer, TokenizerBuilder},
-};
+use crate::{from_pretrained::TokenizerInfo, impl_tokenizer, tokenizer::TokenizerBuilder};
 
 const ROBERTA_MAX_LENGTH: usize = 512;
 const ROBERTA_BOS_TOKEN: &str = "<s>";
@@ -33,6 +29,7 @@ pub struct RobertaTokenizer {
     pad_token: Option<String>,
     sep_token: Option<String>,
     unk_token: Option<String>,
+    chat_template: Option<ChatTemplate>,
 }
 
 impl_tokenizer!(RobertaTokenizer);
@@ -169,6 +166,7 @@ impl TokenizerBuilder<RobertaTokenizer> for RobertaTokenizerBuilder {
             pad_token: Some(pad_token),
             sep_token: Some(sep_token),
             unk_token: Some(unk_token),
+            chat_template: None,
         })
     }
 }

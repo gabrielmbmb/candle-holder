@@ -1,5 +1,5 @@
 use candle_holder::utils::serde::deserialize_single_or_vec;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]

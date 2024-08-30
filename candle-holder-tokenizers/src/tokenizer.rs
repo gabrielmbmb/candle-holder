@@ -1,9 +1,10 @@
 use candle_core::{DType, Device, Tensor};
-use candle_holder::{bail, Error, FromPretrainedParameters, Result};
+use candle_holder::{Error, FromPretrainedParameters, Result};
 use tokenizers::{
     AddedToken, PaddingDirection, PaddingParams, PaddingStrategy, Tokenizer as CoreTokenizer,
 };
 
+use crate::chat_template::{ChatTemplate, Message};
 use crate::tokenizers::bert::{BertTokenizer, BertTokenizerBuilder};
 use crate::tokenizers::llama::{LlamaTokenizer, LlamaTokenizerBuilder};
 use crate::tokenizers::roberta::{RobertaTokenizer, RobertaTokenizerBuilder};
@@ -124,6 +125,7 @@ pub trait Tokenizer: std::fmt::Debug {
     fn get_pad_token(&self) -> Option<&str>;
     fn get_sep_token(&self) -> Option<&str>;
     fn get_unk_token(&self) -> Option<&str>;
+    fn get_chat_template(&self) -> Option<&ChatTemplate>;
 
     /// Get the token ID of a given token.
     ///
@@ -276,13 +278,49 @@ pub trait Tokenizer: std::fmt::Debug {
             .map_err(|e| Error::TokenizerEncodingError(e.to_string()))
     }
 
-    // fn apply_chat_template(&self, tokenize: bool) -> Result<String> {}
+    /// Applies the chat template to a list of messages i.e. using the model chat template and the
+    /// provided messages it creates an input string for the model in the expected format.
+    ///
+    /// # Arguments
+    ///
+    /// * `messages` - A list of messages to apply the chat template.
+    ///
+    /// # Returns
+    ///
+    /// The input string for the model in the expected format.
+    fn apply_chat_template(&self, messages: Vec<Message>) -> Result<String> {
+        let chat_template = self.get_chat_template().ok_or_else(|| {
+            Error::MissingChatTemplate("Chat template not found in the tokenizer".to_string())
+        })?;
+        chat_template.apply(messages)
+    }
+
+    /// Applies the chat template to a list of messages and encodes the result.
+    ///
+    /// # Arguments
+    ///
+    /// * `messages` - A list of messages to apply the chat template.
+    ///
+    /// # Returns
+    ///
+    /// A `BatchEncoding` containing the encoded sequences.
+    fn apply_chat_template_and_encode(&self, messages: Vec<Message>) -> Result<BatchEncoding> {
+        let chat_template = self.get_chat_template().ok_or_else(|| {
+            Error::MissingChatTemplate("Chat template not found in the tokenizer".to_string())
+        })?;
+        let chat = chat_template.apply(messages)?;
+        self.encode(vec![chat], true, None)
+    }
 }
 
 /// A macro that implements the `Tokenizer` trait for a given tokenizer type.
 #[macro_export]
 macro_rules! impl_tokenizer {
     ($tokenizer_type:ty) => {
+        use crate::chat_template::ChatTemplate;
+        use crate::tokenizer::{PaddingSide, Tokenizer};
+        use tokenizers::Tokenizer as CoreTokenizer;
+
         impl Tokenizer for $tokenizer_type {
             fn get_tokenizer(&self) -> &CoreTokenizer {
                 &self.tokenizer
@@ -322,6 +360,10 @@ macro_rules! impl_tokenizer {
 
             fn get_unk_token(&self) -> Option<&str> {
                 self.unk_token.as_deref()
+            }
+
+            fn get_chat_template(&self) -> Option<&ChatTemplate> {
+                self.chat_template.as_ref()
             }
         }
     };

@@ -167,6 +167,10 @@ impl TokenizerInfo {
         }
     }
 
+    pub fn get_config(&self) -> Option<&TokenizerConfig> {
+        self.config.as_ref()
+    }
+
     pub fn get_tokenizer_class(&self) -> &str {
         if let Some(config) = &self.config {
             if let Some(tokenizer_class) = &config.tokenizer_class {
