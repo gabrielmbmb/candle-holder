@@ -1,5 +1,5 @@
 use candle_core::{DType, Device, Tensor};
-use candle_holder::{bail, utils::from_pretrained::FromPretrainedParameters, Result};
+use candle_holder::{utils::from_pretrained::FromPretrainedParameters, Error, Result};
 use candle_holder_tokenizers::Tokenizer;
 use candle_nn::VarBuilder;
 
@@ -186,10 +186,7 @@ pub trait PreTrainedModel {
     /// # Arguments
     ///
     /// * `input_ids` - The input sequences.
-    /// * `generation_config` - Optional generation configuration. If not provided, the model's
-    ///  default generation configuration will be used (if available). Otherwise, default
-    ///  generation configuration will be used.
-    /// * `seed` - Optional seed for the random number generator.
+    /// * `params` - The generation parameters.
     ///
     /// # Returns
     ///
@@ -300,7 +297,7 @@ macro_rules! impl_auto_model_from_pretrained_method {
                             }
                         },
                     )*
-                    _ => bail!(format!("Model '{}' type not supported", model_type)),
+                    _ => Err(Error::ModelNotImplemented(model_type.to_string()))
                 };
 
                 model

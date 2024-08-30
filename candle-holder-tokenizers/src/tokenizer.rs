@@ -275,6 +275,8 @@ pub trait Tokenizer: std::fmt::Debug {
             .decode(ids, skip_special_tokens)
             .map_err(|e| Error::TokenizerEncodingError(e.to_string()))
     }
+
+    // fn apply_chat_template(&self, tokenize: bool) -> Result<String> {}
 }
 
 /// A macro that implements the `Tokenizer` trait for a given tokenizer type.
@@ -411,8 +413,9 @@ macro_rules! impl_auto_tokenizer_from_pretrained_method {
                 params: Option<FromPretrainedParameters>
             ) -> Result<Box<dyn Tokenizer>> {
                 let tokenizer_info = from_pretrained(repo_id, params)?;
+                let tokenizer_class = tokenizer_info.get_tokenizer_class();
 
-                let tokenizer: Result<Box<dyn Tokenizer>> = match tokenizer_info.get_tokenizer_class() {
+                let tokenizer: Result<Box<dyn Tokenizer>> = match tokenizer_class {
                     $(
                         $tokenizer_class => {
                             $tokenizer_builder_struct::new(tokenizer_info, padding_side)
@@ -420,7 +423,7 @@ macro_rules! impl_auto_tokenizer_from_pretrained_method {
                                 .map(|tokenizer| Box::new(tokenizer) as Box<dyn Tokenizer>)
                         }
                     )*
-                    _ => bail!(format!("Could not determine tokenizer class")),
+                    _ => Err(Error::TokenizerNotImplemented(tokenizer_class.to_string())),
                 };
 
                 tokenizer

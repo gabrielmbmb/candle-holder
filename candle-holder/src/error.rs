@@ -24,6 +24,14 @@ impl std::error::Error for WrappedError {
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     // -----------------------------------
+    // From pretrained errors
+    // -----------------------------------
+    #[error("Model '{0}' is not implemented. Create a new issue in 'https://github.com/gabrielmbmb/candle-holder' to request the implementation.")]
+    ModelNotImplemented(String),
+    #[error("Tokenizer '{0}' is not implemented. Create a new issue in 'https://github.com/gabrielmbmb/candle-holder' to request the implementation.")]
+    TokenizerNotImplemented(String),
+
+    // -----------------------------------
     // Load model errors
     // -----------------------------------
     #[error("Model weights not found in the repo.")]
