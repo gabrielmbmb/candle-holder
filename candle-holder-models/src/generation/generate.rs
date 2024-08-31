@@ -8,6 +8,17 @@ use super::{
 };
 use crate::{utils::cache::DynamicCache, ForwardParams, PreTrainedModel};
 
+#[derive(Debug)]
+pub struct GenerateOutput {
+    sequences: Vec<Vec<u32>>,
+}
+
+impl GenerateOutput {
+    pub fn get_sequences(&self) -> &Vec<Vec<u32>> {
+        &self.sequences
+    }
+}
+
 /// Generates a completion of the input sequences using the provided `model`.
 ///
 /// # Arguments
@@ -28,9 +39,9 @@ pub fn generate<'a, M: PreTrainedModel + ?Sized>(
     stopping_criteria: Option<Vec<Box<dyn StoppingCriteria>>>,
     mut token_streamer: Option<Box<dyn TokenStreamer<'a> + 'a>>,
     seed: Option<u64>,
-) -> Result<Vec<Vec<u32>>> {
+) -> Result<Vec<GenerateOutput>> {
+    let mut input_ids = input_ids.repeat((generation_config.get_num_return_sequences(), 1))?;
     let mut output = input_ids.to_vec2::<u32>()?;
-    let mut input_ids = input_ids.clone();
     let input_ids_dims = input_ids.dims2()?;
 
     if input_ids_dims.1.ge(&generation_config.get_max_length())
@@ -55,7 +66,7 @@ pub fn generate<'a, M: PreTrainedModel + ?Sized>(
     };
 
     // TODO: refactor this into `LogitProcessor` trait
-    let mut sampling_config = LogitSampler::from_generation_config(generation_config, seed);
+    let mut logit_sampler = LogitSampler::from_generation_config(generation_config, seed);
 
     // Initialize the stopping criteria applier that will be used to determine when to stop
     let stopping_criteria_applier = StoppingCriteriaApplier::from_configuration(
@@ -67,8 +78,6 @@ pub fn generate<'a, M: PreTrainedModel + ?Sized>(
     let num_sequences = input_ids_dims.0;
     let mut active_sequences = num_sequences;
 
-    // TODO: if `generation_config.num_return_sequences>1` then we need to expand the
-    // `input_ids` tensor to have `num_return_sequences` times the number of sequences
     stream_tokens(&mut token_streamer, &input_ids.to_vec2::<u32>()?)?;
 
     // Generation loop
@@ -101,7 +110,7 @@ pub fn generate<'a, M: PreTrainedModel + ?Sized>(
             }
 
             // Sample next token
-            let next_token_id = sampling_config.sample(&seq_logits)?;
+            let next_token_id = logit_sampler.sample(&seq_logits)?;
 
             // Update the sequences with the next token
             output[i].push(next_token_id);
@@ -120,12 +129,13 @@ pub fn generate<'a, M: PreTrainedModel + ?Sized>(
 
         // Build the next `input_ids` vectors with the last token of each sequence
         let sequences_last_tokens: Vec<u32> = sequences_last_tokens.into_iter().flatten().collect();
-        input_ids = Tensor::new(&sequences_last_tokens[..], input_ids.device())?.unsqueeze(0)?;
+        input_ids = Tensor::new(&sequences_last_tokens[..], input_ids.device())?
+            .reshape((num_sequences, 1))?;
     }
 
     stream_end(&mut token_streamer)?;
 
-    Ok(output)
+    Ok(create_outputs(output, num_sequences))
 }
 
 fn stream_tokens(
@@ -143,4 +153,14 @@ fn stream_end(token_streamer: &mut Option<Box<dyn TokenStreamer + '_>>) -> Resul
         streamer.end()?;
     }
     Ok(())
+}
+
+fn create_outputs(outputs: Vec<Vec<u32>>, num_return_sequences: usize) -> Vec<GenerateOutput> {
+    let mut generate_outputs = Vec::new();
+    for generated_sequences in outputs.chunks(num_return_sequences) {
+        let sequences = generated_sequences.to_vec();
+        let output = GenerateOutput { sequences };
+        generate_outputs.push(output);
+    }
+    generate_outputs
 }

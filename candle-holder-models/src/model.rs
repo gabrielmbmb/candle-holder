@@ -6,7 +6,11 @@ use candle_nn::VarBuilder;
 use crate::{
     config::PretrainedConfig,
     from_pretrained::from_pretrained,
-    generation::{config::GenerationConfig, generate::generate, StoppingCriteria, TokenStreamer},
+    generation::{
+        config::GenerationConfig,
+        generate::{generate, GenerateOutput},
+        StoppingCriteria, TokenStreamer,
+    },
     models::{
         bert::{
             BertForMaskedLM, BertForSequenceClassification, BertForTokenClassification, BertModel,
@@ -195,10 +199,27 @@ pub trait PreTrainedModel {
         &self,
         input_ids: &Tensor,
         params: GenerationParams<'a>,
-    ) -> Result<Vec<Vec<u32>>> {
-        let generation_config = params
-            .generation_config
-            .unwrap_or_else(|| self.get_generation_config().clone());
+    ) -> Result<Vec<GenerateOutput>> {
+        let (mut generation_config, used_model_generation_config) = match params.generation_config {
+            Some(config) => (config, false),
+            None => (self.get_generation_config().clone(), true),
+        };
+
+        if !used_model_generation_config {
+            if generation_config.get_bos_token_id().is_none() {
+                generation_config.bos_token_id = self.get_generation_config().get_bos_token_id();
+            }
+
+            if generation_config.get_eos_token_id().is_none() {
+                generation_config.eos_token_id =
+                    self.get_generation_config().get_eos_token_id().cloned();
+            }
+
+            if generation_config.get_pad_token_id().is_none() {
+                generation_config.pad_token_id = self.get_generation_config().get_pad_token_id();
+            }
+        }
+
         generate(
             self,
             input_ids,

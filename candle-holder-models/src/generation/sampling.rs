@@ -8,6 +8,7 @@ use crate::generation::config::GenerationConfig;
 
 /// An enum containing the available sampling strategies for selecting the next token id of a
 /// sequence using the outputs logits of an auto-regressive model.
+#[derive(Debug)]
 pub enum SamplingStrategy {
     /// Greedy sampling selects the token with the highest probability.
     Greedy,
@@ -23,6 +24,7 @@ pub enum SamplingStrategy {
 }
 
 /// A struct for sampling the next token id from the logits of an auto-regressive model.
+#[derive(Debug)]
 pub struct LogitSampler {
     /// The sampling strategy to use.
     strategy: SamplingStrategy,

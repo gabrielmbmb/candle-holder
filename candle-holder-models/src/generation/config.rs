@@ -29,7 +29,7 @@ pub struct GenerationConfig {
     pub min_length: Option<usize>,
     /// A string or a list of strings that should terminate the generation if the model outputs
     /// them.
-    #[serde(deserialize_with = "deserialize_single_or_vec")]
+    #[serde(default, deserialize_with = "deserialize_single_or_vec")]
     pub stop_strings: Option<Vec<String>>,
     /// Whether or not to use sampling. If `false`, then greedy decoding will be used. The default
     /// is `false`.
@@ -53,6 +53,9 @@ pub struct GenerationConfig {
     /// `0.0` to `infinity`. A value of `1.0` means no penalty. The default is `1.0`.
     #[serde(default)]
     pub repetition_penalty: Option<f64>,
+    /// The number of sequences to generate. The default is `1`.
+    #[serde(default)]
+    pub num_return_sequences: usize,
     /// The ID of the PAD token.
     #[serde(default)]
     pub pad_token_id: Option<u32>,
@@ -105,6 +108,10 @@ impl GenerationConfig {
         self.repetition_penalty
     }
 
+    pub fn get_num_return_sequences(&self) -> usize {
+        self.num_return_sequences
+    }
+
     pub fn get_pad_token_id(&self) -> Option<u32> {
         self.pad_token_id
     }
@@ -131,6 +138,7 @@ impl Default for GenerationConfig {
             top_k: Some(50),
             top_p: Some(1.0),
             repetition_penalty: Some(1.0),
+            num_return_sequences: 1,
             pad_token_id: None,
             bos_token_id: None,
             eos_token_id: None,
