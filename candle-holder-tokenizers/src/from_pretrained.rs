@@ -174,7 +174,9 @@ impl TokenizerInfo {
     pub fn get_tokenizer_class(&self) -> &str {
         if let Some(config) = &self.config {
             if let Some(tokenizer_class) = &config.tokenizer_class {
-                return tokenizer_class;
+                if tokenizer_class != "PreTrainedTokenizerFast" {
+                    return tokenizer_class;
+                }
             }
         }
 

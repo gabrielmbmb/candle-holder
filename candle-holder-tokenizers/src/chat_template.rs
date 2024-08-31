@@ -4,7 +4,7 @@ use minijinja_contrib::pycompat;
 use serde::{Deserialize, Serialize};
 
 /// Represents a message in a conversation between a user and an assistant.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
     /// The role of the message. Can be "system", "user", or "assistant".
     role: String,
