@@ -40,7 +40,8 @@ pub fn generate<'a, M: PreTrainedModel + ?Sized>(
     mut token_streamer: Option<Box<dyn TokenStreamer<'a> + 'a>>,
     seed: Option<u64>,
 ) -> Result<Vec<GenerateOutput>> {
-    let mut input_ids = input_ids.repeat((generation_config.get_num_return_sequences(), 1))?;
+    let num_return_sequences = generation_config.get_num_return_sequences();
+    let mut input_ids = input_ids.repeat((num_return_sequences, 1))?;
     let mut output = input_ids.to_vec2::<u32>()?;
     let input_ids_dims = input_ids.dims2()?;
 
@@ -135,7 +136,7 @@ pub fn generate<'a, M: PreTrainedModel + ?Sized>(
 
     stream_end(&mut token_streamer)?;
 
-    Ok(create_outputs(output, num_sequences))
+    Ok(create_outputs(output, num_return_sequences))
 }
 
 fn stream_tokens(

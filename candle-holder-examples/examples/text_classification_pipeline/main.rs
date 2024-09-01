@@ -19,6 +19,7 @@ fn main() -> Result<()> {
         ],
         Some(1),
     )?;
+
     println!("`pipeline.run_batch` results: {:?}", results);
 
     Ok(())

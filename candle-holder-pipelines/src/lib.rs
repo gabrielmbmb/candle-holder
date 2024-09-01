@@ -6,7 +6,7 @@ pub mod zero_shot_classification;
 
 pub use fill_mask::{FillMaskOptions, FillMaskPipeline};
 pub use text_classification::TextClassificationPipeline;
-pub use text_generation::TextGenerationPipeline;
+pub use text_generation::{TextGenerationPipeline, TextGenerationPipelineOutput};
 pub use token_classification::{
     AggregationStrategy, TokenClassificationOptions, TokenClassificationPipeline,
 };

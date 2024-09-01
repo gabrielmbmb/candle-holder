@@ -28,5 +28,25 @@ fn main() -> Result<()> {
 
     println!("`pipeline.run` results: {:?}", generations);
 
+    let generations = pipeline.run_batch(
+        vec![
+            vec![Message::user("How much is 2 + 2?")],
+            vec![Message::user("How much is 2 x 3?")],
+        ],
+        Some(GenerationParams {
+            generation_config: Some(GenerationConfig {
+                do_sample: true,
+                max_new_tokens: Some(256),
+                top_p: Some(0.9),
+                top_k: None,
+                temperature: 0.6,
+                ..GenerationConfig::default()
+            }),
+            ..Default::default()
+        }),
+    )?;
+
+    println!("`pipeline.run_batch` results: {:?}", generations);
+
     Ok(())
 }

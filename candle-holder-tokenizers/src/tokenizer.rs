@@ -284,15 +284,20 @@ pub trait Tokenizer: std::fmt::Debug {
     /// # Arguments
     ///
     /// * `messages` - A list of messages to apply the chat template.
+    /// * `add_generation_prompt` - A flag indicating if the generation prompt should be added.
     ///
     /// # Returns
     ///
     /// The input string for the model in the expected format.
-    fn apply_chat_template(&self, messages: Vec<Message>) -> Result<String> {
+    fn apply_chat_template(
+        &self,
+        messages: Vec<Message>,
+        add_generation_prompt: bool,
+    ) -> Result<String> {
         let chat_template = self.get_chat_template().ok_or_else(|| {
             Error::MissingChatTemplate("Chat template not found in the tokenizer".to_string())
         })?;
-        chat_template.apply(messages)
+        chat_template.apply(messages, add_generation_prompt)
     }
 
     /// Applies the chat template to a list of messages and encodes the result.
@@ -304,12 +309,16 @@ pub trait Tokenizer: std::fmt::Debug {
     /// # Returns
     ///
     /// A `BatchEncoding` containing the encoded sequences.
-    fn apply_chat_template_and_encode(&self, messages: Vec<Message>) -> Result<BatchEncoding> {
+    fn apply_chat_template_and_encode(
+        &self,
+        messages: Vec<Message>,
+        add_generation_prompt: bool,
+    ) -> Result<BatchEncoding> {
         let chat_template = self.get_chat_template().ok_or_else(|| {
             Error::MissingChatTemplate("Chat template not found in the tokenizer".to_string())
         })?;
-        let chat = chat_template.apply(messages)?;
-        self.encode(vec![chat], true, None)
+        let chat = chat_template.apply(messages, add_generation_prompt)?;
+        self.encode(vec![chat], false, None)
     }
 }
 

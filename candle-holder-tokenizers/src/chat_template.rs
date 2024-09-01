@@ -43,6 +43,7 @@ struct ChatTemplateInputs {
     messages: Vec<Message>,
     bos_token: Option<String>,
     eos_token: Option<String>,
+    add_generation_prompt: bool,
 }
 
 /// https://github.com/huggingface/text-generation-inference/blob/d9fbbaafb046bb423e31edaf9ccf8eecc2d5c33d/router/src/infer/chat_template.rs#L4
@@ -76,12 +77,13 @@ impl ChatTemplate {
         })
     }
 
-    pub fn apply(&self, messages: Vec<Message>) -> Result<String> {
+    pub fn apply(&self, messages: Vec<Message>, add_generation_prompt: bool) -> Result<String> {
         self.template
             .render(&ChatTemplateInputs {
                 messages,
                 bos_token: self.bos_token.clone(),
                 eos_token: self.eos_token.clone(),
+                add_generation_prompt,
             })
             .map_err(Error::wrap)
     }
