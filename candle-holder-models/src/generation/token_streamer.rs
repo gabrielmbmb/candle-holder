@@ -16,8 +16,12 @@ pub trait TokenStreamer<'a> {
 pub struct TextStreamer<'a> {
     /// The tokenizer used to decode the tokens into text.
     tokenizer: &'a Box<dyn Tokenizer>,
+    /// Whether to skip the prompt when decoding the tokens into text.
+    skip_prompt: bool,
     /// Whether to skip special tokens when decoding the tokens
     skip_special_tokens: bool,
+    /// Whether the next tokens are part of the prompt.
+    next_tokens_are_prompt: bool,
     /// A cache to store the tokens until a printable text is found.
     token_cache: Vec<u32>,
     /// The length of text that can be printed from the token cache.
@@ -31,15 +35,22 @@ impl<'a> TextStreamer<'a> {
     /// # Arguments
     ///
     /// * `tokenizer` - The tokenizer used to decode the tokens into text.
+    /// * `skip_prompt` - Whether to skip the prompt when decoding the tokens into text.
     /// * `skip_special_tokens` - Whether to skip special tokens when decoding the tokens.
     ///
     /// # Returns
     ///
     /// A new `TextStreamer`.
-    pub fn new(tokenizer: &'a Box<dyn Tokenizer>, skip_special_tokens: bool) -> Self {
+    pub fn new(
+        tokenizer: &'a Box<dyn Tokenizer>,
+        skip_prompt: bool,
+        skip_special_tokens: bool,
+    ) -> Self {
         TextStreamer {
             tokenizer,
+            skip_prompt,
             skip_special_tokens,
+            next_tokens_are_prompt: true,
             token_cache: vec![],
             print_len: 0,
         }
@@ -83,6 +94,11 @@ impl<'a> TokenStreamer<'a> for TextStreamer<'a> {
             return Err(Error::msg(
                 "`TextStreamer` can only handle one sequence of tokens at a time.",
             ));
+        }
+
+        if self.skip_prompt && self.next_tokens_are_prompt {
+            self.next_tokens_are_prompt = false;
+            return Ok(());
         }
 
         self.token_cache.extend_from_slice(&tokens[0]);

@@ -1,49 +1,56 @@
-use anyhow::Result;
-use std::env;
-
+use anyhow::{anyhow, Result};
 use candle_core::Device;
+use clap::Parser;
+use std::str::FromStr;
 
+#[derive(Debug, Parser)]
+#[command(author, version, about, long_about = None)]
+pub struct Cli {
+    #[arg(long, value_parser = parse_device, default_value = "cpu")]
+    pub device: DeviceOption,
+}
+
+impl Cli {
+    pub fn get_device(&self) -> Result<Device> {
+        match self.device {
+            DeviceOption::Cuda(device_id) if cfg!(feature = "cuda") => {
+                Ok(Device::new_cuda(device_id)?)
+            }
+            DeviceOption::Metal if cfg!(feature = "metal") => Ok(Device::new_metal(0)?),
+            DeviceOption::Cpu => Ok(Device::Cpu),
+            _ => Err(anyhow!("Requested device is not available")),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub enum DeviceOption {
     Cpu,
     Metal,
     Cuda(usize),
 }
 
-pub fn get_device(device: Option<DeviceOption>) -> Result<Device> {
-    let device = match device {
-        Some(DeviceOption::Cuda(device_id)) if cfg!(feature = "cuda") => {
-            Device::new_cuda(device_id)?
-        }
-        Some(DeviceOption::Metal) if cfg!(feature = "metal") => Device::new_metal(0)?,
-        _ => Device::Cpu,
-    };
+impl FromStr for DeviceOption {
+    type Err = anyhow::Error;
 
-    Ok(device)
-}
-
-pub fn parse_device_option() -> Option<DeviceOption> {
-    let args: Vec<String> = env::args().collect();
-
-    // Expecting something like: --device cpu, --device metal, or --device cuda:<id>
-    if args.len() > 2 && args[1] == "--device" {
-        match args[2].as_str() {
-            "metal" => Some(DeviceOption::Metal),
-            cuda if cuda.starts_with("cuda:") => {
-                let id_part = &cuda["cuda:".len()..];
-                if let Ok(device_id) = id_part.parse::<usize>() {
-                    Some(DeviceOption::Cuda(device_id))
-                } else {
-                    eprintln!("Error: Invalid CUDA device id: {}", id_part);
-                    None
-                }
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "cpu" => Ok(DeviceOption::Cpu),
+            "metal" => Ok(DeviceOption::Metal),
+            s if s.starts_with("cuda:") => {
+                let id = s.strip_prefix("cuda:").unwrap().parse::<usize>()?;
+                Ok(DeviceOption::Cuda(id))
             }
-            _ => Some(DeviceOption::Cpu),
+            _ => Err(anyhow!("Invalid device option: {}", s)),
         }
-    } else {
-        Some(DeviceOption::Cpu)
     }
 }
 
+fn parse_device(s: &str) -> Result<DeviceOption, anyhow::Error> {
+    DeviceOption::from_str(s)
+}
+
 pub fn get_device_from_args() -> Result<Device> {
-    get_device(parse_device_option())
+    let cli = Cli::parse();
+    cli.get_device()
 }

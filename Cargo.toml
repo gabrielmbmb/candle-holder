@@ -33,3 +33,4 @@ accelerate-src = { version = "0.3.2" }
 intel-mkl-src = { version = "0.8.1", features = ["mkl-static-lp64-iomp"] }
 minijinja = "2.2.0"
 minijinja-contrib = { version = "2.2.0", features = ["pycompat"] }
+clap = { version = "4.5.16", features = ["derive"] }
