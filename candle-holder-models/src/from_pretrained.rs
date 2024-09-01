@@ -18,6 +18,7 @@ use candle_holder::{
 };
 
 use crate::generation::config::GenerationConfig;
+use crate::utils::var_builder::CompatibilityTensorRetrievalBackend;
 
 const MODEL_GENERATION_CONFIG_FILE: &str = "generation_config.json";
 const MODEL_SAFETENSORS_INDEX_FILE: &str = "model.safetensors.index.json";
@@ -48,13 +49,33 @@ impl ModelInfo {
     ///
     /// A `VarBuilder` containing the model weights.
     pub fn get_var_builder(&self, dtype: DType, device: &Device) -> Result<VarBuilder> {
-        let vb = match self.from_pth {
-            true => VarBuilder::from_pth(&self.weights_file_paths[0], dtype, device)?,
+        let model_name = self.get_model_name();
+        let backend = match self.from_pth {
+            true => CompatibilityTensorRetrievalBackend::from_pth(
+                &self.weights_file_paths[0],
+                model_name,
+            )?,
             false => unsafe {
-                VarBuilder::from_mmaped_safetensors(&self.weights_file_paths, dtype, device)?
+                CompatibilityTensorRetrievalBackend::from_mmaped_safetensors(
+                    &self.weights_file_paths,
+                    model_name,
+                )?
             },
         };
-        Ok(vb)
+        Ok(VarBuilder::from_backend(
+            Box::new(backend),
+            dtype,
+            device.clone(),
+        ))
+    }
+
+    pub fn get_model_name(&self) -> String {
+        self.config
+            .as_ref()
+            .and_then(|config| config.get("model_type"))
+            .and_then(|model_type| model_type.as_str())
+            .unwrap_or_default()
+            .to_string()
     }
 
     /// Gets a reference to the model configuration.
