@@ -111,7 +111,7 @@ mod tests {
                 content: "Hi".to_string(),
             },
         ];
-        let result = chat_template.apply(messages).unwrap();
+        let result = chat_template.apply(messages, true).unwrap();
         assert_eq!("Hello user: Hello\nHi assistant: Hi\n", result);
     }
 }
