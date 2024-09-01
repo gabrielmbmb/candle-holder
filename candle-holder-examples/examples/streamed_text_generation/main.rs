@@ -58,8 +58,11 @@ fn main() -> Result<()> {
 
     let start = std::time::Instant::now();
 
-    let token_streamer: Box<dyn TokenStreamer> =
-        Box::new(TextStreamer::new(&tokenizer, true, true));
+    let token_streamer: Box<dyn TokenStreamer> = Box::new(TextStreamer::new(
+        &tokenizer,
+        args.apply_chat_template,
+        true,
+    ));
 
     let input_ids = encodings.get_input_ids();
     model.generate(
