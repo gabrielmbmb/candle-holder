@@ -87,11 +87,12 @@ pub fn generate<'a, M: PreTrainedModel + ?Sized>(
             break;
         }
 
-        let logits = model.forward(ForwardParams {
+        let model_output = model.forward(ForwardParams {
             input_ids: Some(&input_ids),
             cache: cache.as_mut(),
             ..Default::default()
         })?;
+        let logits = model_output.get_logits().unwrap();
         let dims = logits.dims3()?;
 
         let last_token_logits = logits.i((.., dims.1 - 1, ..))?;

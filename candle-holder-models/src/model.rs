@@ -118,6 +118,42 @@ impl Default for GenerationParams<'_> {
     }
 }
 
+/// The output of a model. It can contain the logits, the last hidden states, and the pooled output
+/// depending on the kind of model.
+#[non_exhaustive]
+#[derive(Debug)]
+pub struct ModelOutput {
+    logits: Option<Tensor>,
+    last_hidden_state: Option<Tensor>,
+    pooled_output: Option<Tensor>,
+}
+
+impl ModelOutput {
+    pub fn new(
+        logits: Option<Tensor>,
+        last_hidden_state: Option<Tensor>,
+        pooled_output: Option<Tensor>,
+    ) -> Self {
+        Self {
+            logits,
+            last_hidden_state,
+            pooled_output,
+        }
+    }
+
+    pub fn get_logits(&self) -> Option<&Tensor> {
+        self.logits.as_ref()
+    }
+
+    pub fn get_last_hidden_state(&self) -> Option<&Tensor> {
+        self.last_hidden_state.as_ref()
+    }
+
+    pub fn get_pooled_output(&self) -> Option<&Tensor> {
+        self.pooled_output.as_ref()
+    }
+}
+
 /// Trait for a pre-trained model.
 pub trait PreTrainedModel {
     /// Loads a model from a `VarBuilder` containing the model's parameters and a model
@@ -183,7 +219,7 @@ pub trait PreTrainedModel {
     /// # Returns
     ///
     /// The model output
-    fn forward(&self, params: ForwardParams) -> Result<Tensor>;
+    fn forward(&self, params: ForwardParams) -> Result<ModelOutput>;
 
     /// Generates a completion of the input sequences.
     ///

@@ -100,7 +100,7 @@ impl ZeroShotClassificationPipeline {
 
     fn postprocess(
         &self,
-        output: Tensor,
+        output: &Tensor,
         num_sequences: usize,
         candidate_labels: &[String],
         multi_label: bool,
@@ -196,7 +196,8 @@ impl ZeroShotClassificationPipeline {
             .collect();
         let encodings = self.preprocess(inputs, &candidate_labels, &options)?;
         let output = self.model.forward(ForwardParams::from(&encodings))?;
-        Ok(self.postprocess(output, 1, &candidate_labels, options.multi_label)?[0].clone())
+        let logits = output.get_logits().unwrap();
+        Ok(self.postprocess(logits, 1, &candidate_labels, options.multi_label)?[0].clone())
     }
 
     /// Classifies a list of sequences.
@@ -225,8 +226,9 @@ impl ZeroShotClassificationPipeline {
             .collect();
         let encodings = self.preprocess(inputs, &candidate_labels, &options)?;
         let output = self.model.forward(ForwardParams::from(&encodings))?;
+        let logits = output.get_logits().unwrap();
         self.postprocess(
-            output,
+            logits,
             num_sequences,
             &candidate_labels,
             options.multi_label,

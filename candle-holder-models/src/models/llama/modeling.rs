@@ -10,7 +10,7 @@ use candle_nn::{
 use crate::{
     config::PretrainedConfig,
     generation::config::GenerationConfig,
-    model::{ForwardParams, PreTrainedModel},
+    model::{ForwardParams, ModelOutput, PreTrainedModel},
     utils::{
         attn_mask::{prepare_4d_causal_attention_mask, repeat_kv},
         cache::DynamicCache,
@@ -397,8 +397,9 @@ impl PreTrainedModel for LlamaModel {
         Ok(Self { model, config })
     }
 
-    fn forward(&self, params: ForwardParams) -> Result<Tensor> {
-        Ok(self.model.forward(params)?)
+    fn forward(&self, params: ForwardParams) -> Result<ModelOutput> {
+        let last_hidden_states = self.model.forward(params)?;
+        Ok(ModelOutput::new(None, Some(last_hidden_states), None))
     }
 
     fn get_config(&self) -> &PretrainedConfig {
@@ -448,10 +449,10 @@ impl PreTrainedModel for LlamaForCausalLM {
         &self.generation_config
     }
 
-    fn forward(&self, params: ForwardParams) -> Result<Tensor> {
-        let outputs = self.model.forward(params)?;
-        let logits = self.lm_head.forward(&outputs)?;
-        Ok(logits)
+    fn forward(&self, params: ForwardParams) -> Result<ModelOutput> {
+        let output = self.model.forward(params)?;
+        let logits = self.lm_head.forward(&output)?;
+        Ok(ModelOutput::new(Some(logits), None, None))
     }
 
     fn get_config(&self) -> &PretrainedConfig {

@@ -169,7 +169,8 @@ impl FillMaskPipeline {
         let options = options.unwrap_or_default();
         let (encodings, masked_index) = self.preprocess(vec![input.into()])?;
         let output = self.model.forward(ForwardParams::from(&encodings))?;
-        Ok(self.postprocess(&output, encodings, masked_index, options.top_k)?[0].clone())
+        let logits = &output.get_logits().unwrap();
+        Ok(self.postprocess(logits, encodings, masked_index, options.top_k)?[0].clone())
     }
 
     /// Fills the masked tokens in a list of sentences.
@@ -191,7 +192,8 @@ impl FillMaskPipeline {
         let inputs: Vec<String> = inputs.into_iter().map(|x| x.into()).collect();
         let (encodings, masked_index) = self.preprocess(inputs)?;
         let output = self.model.forward(ForwardParams::from(&encodings))?;
-        self.postprocess(&output, encodings, masked_index, options.top_k)
+        let logits = &output.get_logits().unwrap();
+        self.postprocess(logits, encodings, masked_index, options.top_k)
     }
 }
 

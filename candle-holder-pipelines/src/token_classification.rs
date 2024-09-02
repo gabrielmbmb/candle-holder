@@ -494,11 +494,12 @@ impl TokenClassificationPipeline {
         let inputs = vec![input.into()];
         let encodings = self.preprocess(inputs.clone())?;
         let output = self.model.forward(ForwardParams::from(&encodings))?;
+        let logits = output.get_logits().unwrap();
         let entities = self
             .postprocess(
                 inputs,
                 encodings.get_input_ids().to_vec2::<u32>()?,
-                &output,
+                logits,
                 encodings.get_encodings(),
                 options.ignore_labels,
                 options.aggregation_strategy,
@@ -528,10 +529,11 @@ impl TokenClassificationPipeline {
         let inputs: Vec<String> = inputs.into_iter().map(|x| x.into()).collect();
         let encodings = self.preprocess(inputs.clone())?;
         let output = self.model.forward(ForwardParams::from(&encodings))?;
+        let logits = output.get_logits().unwrap();
         self.postprocess(
             inputs,
             encodings.get_input_ids().to_vec2::<u32>()?,
-            &output,
+            logits,
             encodings.get_encodings(),
             options.ignore_labels,
             options.aggregation_strategy,

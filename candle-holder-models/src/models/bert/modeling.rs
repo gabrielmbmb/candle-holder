@@ -9,7 +9,7 @@ use super::config::{BertConfig, HiddenAct};
 
 use crate::{
     config::PretrainedConfig,
-    model::{ForwardParams, PreTrainedModel},
+    model::{ForwardParams, ModelOutput, PreTrainedModel},
     utils::attn_mask::get_extended_attention_mask,
 };
 
@@ -432,7 +432,7 @@ impl Module for BertOnlyMLMHead {
 pub struct Bert {
     embeddings: BertEmbeddings,
     encoder: BertEncoder,
-    pooler: Option<BertPooler>,
+    pooler: BertPooler,
     config: BertConfig,
 }
 
@@ -444,18 +444,7 @@ impl Bert {
         Ok(Self {
             embeddings,
             encoder,
-            pooler: Some(pooler),
-            config: config.clone(),
-        })
-    }
-
-    pub fn load_without_pooler(vb: VarBuilder, config: &BertConfig) -> Result<Self> {
-        let embeddings = BertEmbeddings::load(vb.pp("embeddings"), config)?;
-        let encoder = BertEncoder::load(vb.pp("encoder"), config)?;
-        Ok(Self {
-            embeddings,
-            encoder,
-            pooler: None,
+            pooler,
             config: config.clone(),
         })
     }
@@ -480,16 +469,15 @@ impl Bert {
         input_ids: &Tensor,
         attention_mask: &Tensor,
         token_type_ids: &Tensor,
-    ) -> Result<(Tensor, Option<Tensor>)> {
+    ) -> Result<ModelOutput> {
         let sequence_output =
             self.forward_return_sequence(input_ids, attention_mask, token_type_ids)?;
-
-        if let Some(pooler) = &self.pooler {
-            let pooled_output = pooler.forward(&sequence_output)?;
-            return Ok((sequence_output, Some(pooled_output)));
-        }
-
-        Ok((sequence_output, None))
+        let pooled_output = self.pooler.forward(&sequence_output)?;
+        Ok(ModelOutput::new(
+            None,
+            Some(sequence_output),
+            Some(pooled_output),
+        ))
     }
 }
 
@@ -505,8 +493,8 @@ impl PreTrainedModel for BertModel {
         Ok(Self { model, config })
     }
 
-    fn forward(&self, params: ForwardParams) -> Result<Tensor> {
-        let (sequence_output, pooled_output) = self.model.forward(
+    fn forward(&self, params: ForwardParams) -> Result<ModelOutput> {
+        self.model.forward(
             params
                 .get_input_ids()
                 .ok_or(Error::MissingForwardParam("input_ids".to_string()))?,
@@ -516,13 +504,7 @@ impl PreTrainedModel for BertModel {
             params
                 .get_token_type_ids()
                 .ok_or(Error::MissingForwardParam("token_type_ids".to_string()))?,
-        )?;
-
-        if let Some(pooled_output) = pooled_output {
-            return Ok(pooled_output);
-        }
-
-        Ok(sequence_output)
+        )
     }
 
     fn get_config(&self) -> &PretrainedConfig {
@@ -556,8 +538,8 @@ impl PreTrainedModel for BertForSequenceClassification {
         })
     }
 
-    fn forward(&self, params: ForwardParams) -> Result<Tensor> {
-        let (_, pooled_output) = self.model.forward(
+    fn forward(&self, params: ForwardParams) -> Result<ModelOutput> {
+        let output = self.model.forward(
             params
                 .get_input_ids()
                 .ok_or(Error::MissingForwardParam("input_ids".to_string()))?,
@@ -568,9 +550,10 @@ impl PreTrainedModel for BertForSequenceClassification {
                 .get_token_type_ids()
                 .ok_or(Error::MissingForwardParam("token_type_ids".to_string()))?,
         )?;
-        let pooled_output = self.dropout.forward(&pooled_output.unwrap(), false)?;
+        let pooled_output = output.get_pooled_output().unwrap();
+        let pooled_output = self.dropout.forward(pooled_output, false)?;
         let logits = self.classifier.forward(&pooled_output)?;
-        Ok(logits)
+        Ok(ModelOutput::new(Some(logits), None, None))
     }
 
     fn get_config(&self) -> &PretrainedConfig {
@@ -604,8 +587,8 @@ impl PreTrainedModel for BertForTokenClassification {
         })
     }
 
-    fn forward(&self, params: ForwardParams) -> Result<Tensor> {
-        let sequence_output = self.model.forward_return_sequence(
+    fn forward(&self, params: ForwardParams) -> Result<ModelOutput> {
+        let output = self.model.forward(
             params
                 .get_input_ids()
                 .ok_or(Error::MissingForwardParam("input_ids".to_string()))?,
@@ -616,9 +599,11 @@ impl PreTrainedModel for BertForTokenClassification {
                 .get_token_type_ids()
                 .ok_or(Error::MissingForwardParam("token_type_ids".to_string()))?,
         )?;
-        let sequence_output = self.dropout.forward(&sequence_output, false)?;
+        let sequence_output = self
+            .dropout
+            .forward(&output.get_last_hidden_state().unwrap(), false)?;
         let logits = self.classifier.forward(&sequence_output)?;
-        Ok(logits)
+        Ok(ModelOutput::new(Some(logits), None, None))
     }
 
     fn get_config(&self) -> &PretrainedConfig {
@@ -635,7 +620,7 @@ pub struct BertForMaskedLM {
 impl PreTrainedModel for BertForMaskedLM {
     fn load(vb: VarBuilder, config: serde_json::Value) -> Result<Self> {
         let config: BertConfig = serde_json::from_value(config)?;
-        let model = Bert::load_without_pooler(vb.pp("bert"), &config)?;
+        let model = Bert::load(vb.pp("bert"), &config)?;
         let cls = BertOnlyMLMHead::load(
             vb.pp("cls"),
             model.embeddings.word_embeddings.clone(),
@@ -644,8 +629,8 @@ impl PreTrainedModel for BertForMaskedLM {
         Ok(Self { model, cls, config })
     }
 
-    fn forward(&self, params: ForwardParams) -> Result<Tensor> {
-        let (sequence_output, _) = self.model.forward(
+    fn forward(&self, params: ForwardParams) -> Result<ModelOutput> {
+        let output = self.model.forward(
             params
                 .get_input_ids()
                 .ok_or(Error::MissingForwardParam("input_ids".to_string()))?,
@@ -656,8 +641,8 @@ impl PreTrainedModel for BertForMaskedLM {
                 .get_token_type_ids()
                 .ok_or(Error::MissingForwardParam("token_type_ids".to_string()))?,
         )?;
-        let logits = self.cls.forward(&sequence_output)?;
-        Ok(logits)
+        let logits = self.cls.forward(&output.get_last_hidden_state().unwrap())?;
+        Ok(ModelOutput::new(Some(logits), None, None))
     }
 
     fn get_config(&self) -> &PretrainedConfig {

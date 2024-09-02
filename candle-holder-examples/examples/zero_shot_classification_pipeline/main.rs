@@ -1,5 +1,4 @@
 use anyhow::Result;
-use candle_core::Device;
 use candle_holder_examples::get_device_from_args;
 use candle_holder_pipelines::ZeroShotClassificationPipeline;
 

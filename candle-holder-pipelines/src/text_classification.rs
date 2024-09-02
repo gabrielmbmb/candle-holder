@@ -57,7 +57,7 @@ impl TextClassificationPipeline {
 
     fn postprocess(
         &self,
-        model_outputs: Tensor,
+        logits: &Tensor,
         top_k: Option<usize>,
     ) -> Result<Vec<Vec<(String, f32)>>> {
         let config = self.model.get_config();
@@ -69,13 +69,13 @@ impl TextClassificationPipeline {
         let problem_type = config.get_problem_type();
         let scores = {
             if *problem_type == ProblemType::MultiLabelClassification || config.num_labels() == 1 {
-                sigmoid(&model_outputs)?
+                sigmoid(logits)?
             } else if *problem_type == ProblemType::SingleLabelClassification
                 || config.num_labels() > 1
             {
-                softmax(&model_outputs, D::Minus1)?
+                softmax(logits, D::Minus1)?
             } else {
-                model_outputs
+                logits.clone()
             }
         }
         .to_vec2::<f32>()?;
@@ -116,7 +116,8 @@ impl TextClassificationPipeline {
     ) -> Result<Vec<(String, f32)>> {
         let encodings = self.preprocess(vec![input.into()])?;
         let output = self.model.forward(ForwardParams::from(&encodings))?;
-        Ok(self.postprocess(output, top_k)?[0].clone())
+        let logits = output.get_logits().unwrap();
+        Ok(self.postprocess(logits, top_k)?[0].clone())
     }
 
     /// Classifies a list of sequences.
@@ -138,6 +139,7 @@ impl TextClassificationPipeline {
         let inputs: Vec<String> = inputs.into_iter().map(|x| x.into()).collect();
         let encodings = self.preprocess(inputs)?;
         let output = self.model.forward(ForwardParams::from(&encodings))?;
-        self.postprocess(output, top_k)
+        let logits = output.get_logits().unwrap();
+        self.postprocess(logits, top_k)
     }
 }
