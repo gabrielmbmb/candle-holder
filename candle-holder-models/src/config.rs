@@ -1,3 +1,4 @@
+use candle_core::DType;
 use candle_holder::utils::serde::deserialize_single_or_vec;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
@@ -38,6 +39,8 @@ pub struct PretrainedConfig {
     /// The IDs of the EOS tokens.
     #[serde(default, deserialize_with = "deserialize_single_or_vec")]
     eos_token_id: Option<Vec<u32>>,
+    #[serde(default)]
+    torch_dtype: Option<String>,
 }
 
 fn deserialize_id2label<'de, D>(deserializer: D) -> Result<Option<HashMap<usize, String>>, D::Error>
@@ -75,6 +78,18 @@ impl PretrainedConfig {
     pub fn get_eos_token_id(&self) -> Option<&Vec<u32>> {
         self.eos_token_id.as_ref()
     }
+
+    pub fn get_dtype(&self) -> Option<DType> {
+        match &self.torch_dtype {
+            Some(dtype) => match dtype.as_str() {
+                "float16" => Some(DType::F16),
+                "float32" => Some(DType::F32),
+                "bfloat16" => Some(DType::BF16),
+                _ => None,
+            },
+            None => None,
+        }
+    }
 }
 
 impl PretrainedConfig {
@@ -96,6 +111,7 @@ impl Default for PretrainedConfig {
             pad_token_id: None,
             bos_token_id: None,
             eos_token_id: None,
+            torch_dtype: None,
         }
     }
 }
