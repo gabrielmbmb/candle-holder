@@ -46,8 +46,12 @@ fn main() -> Result<()> {
     let model = AutoModelForCausalLM::from_pretrained(args.model, &device, None, None)?;
 
     let mut encodings = if args.apply_chat_template {
+        let mut messages = vec![Message::user(args.prompt.clone())];
+        if let Some(system_prompt) = args.system_prompt {
+            messages.insert(0, Message::system(system_prompt))
+        }
         tokenizer
-            .apply_chat_template_and_encode(vec![Message::user(args.prompt)], true)
+            .apply_chat_template_and_encode(messages, true)
             .map_err(Error::msg)?
     } else {
         tokenizer
