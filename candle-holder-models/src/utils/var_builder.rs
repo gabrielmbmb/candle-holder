@@ -73,7 +73,7 @@ impl CompatibilityTensorRetrievalBackend {
             .unwrap_or(name);
 
         // Function to replace weight/bias with beta/gamma
-        let replace_weight_bias = |s: &str| s.replace("weight", "beta").replace("bias", "gamma");
+        let replace_weight_bias = |s: &str| s.replace("weight", "gamma").replace("bias", "beta");
 
         // Generate all possible combinations
         let possible_names = [
