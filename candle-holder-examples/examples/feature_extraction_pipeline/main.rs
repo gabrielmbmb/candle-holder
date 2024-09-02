@@ -1,6 +1,6 @@
 use anyhow::Result;
 use candle_holder_examples::get_device_from_args;
-use candle_holder_pipelines::{FeatureExtractionOptions, FeatureExtractionPipeline, Pooling};
+use candle_holder_pipelines::FeatureExtractionPipeline;
 
 fn main() -> Result<()> {
     let device = get_device_from_args()?;
