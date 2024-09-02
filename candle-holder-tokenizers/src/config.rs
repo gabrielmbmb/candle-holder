@@ -39,7 +39,11 @@ pub struct TokenizerConfig {
     pub do_basic_tokenize: Option<bool>,
     pub do_lower_case: Option<bool>,
     pub mask_token: Option<String>,
-    #[serde(deserialize_with = "deserialize_model_max_length")]
+    #[serde(
+        default,
+        alias = "max_len",
+        deserialize_with = "deserialize_model_max_length"
+    )]
     pub model_max_length: Option<usize>,
     pub never_split: Option<Vec<String>>,
     pub pad_token: Option<String>,
