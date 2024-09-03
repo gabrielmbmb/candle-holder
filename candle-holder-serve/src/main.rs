@@ -1,81 +1,38 @@
+mod cli;
 mod routes;
 
-use anyhow::{anyhow, Result};
-use axum::{routing::get, Router};
+use anyhow::Result;
+use axum::Router;
 use clap::Parser;
-use serde::Serialize;
-use std::str::FromStr;
 
-#[derive(Debug, Parser)]
-#[command(version, about, long_about = None)]
-pub struct Cli {
-    /// The host to listen on.
-    #[arg(long, default_value = "0.0.0.0:3000")]
-    host: String,
-
-    /// The Hugging Face repository id of the model to be loaded.
-    #[arg(short, long)]
-    model: String,
-
-    /// The name of the pipeline to be served.
-    #[arg(short, long)]
-    pipeline: Pipeline,
-
-    /// The device to run the pipeline on.
-    #[arg(short, long, value_parser = parse_device, default_value = "cpu")]
-    device: DeviceOption,
-}
-
-#[derive(Debug, Parser, Clone, Serialize, clap::ValueEnum)]
-#[serde(rename_all = "kebab-case")]
-pub enum Pipeline {
-    FeatureExtraction,
-    FillMask,
-    TextClassification,
-    TextGeneration,
-    TokenClassification,
-    ZeroShotClassification,
-}
-
-#[derive(Debug, Clone, clap::ValueEnum)]
-pub enum DeviceOption {
-    Cpu,
-    Metal,
-    #[value(skip)]
-    Cuda(usize),
-}
-
-impl FromStr for DeviceOption {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "cpu" => Ok(DeviceOption::Cpu),
-            "metal" => Ok(DeviceOption::Metal),
-            s if s.starts_with("cuda:") => {
-                let id = s.strip_prefix("cuda:").unwrap().parse::<usize>()?;
-                Ok(DeviceOption::Cuda(id))
-            }
-            _ => Err(anyhow!("Invalid device option: {}", s)),
-        }
-    }
-}
-
-fn parse_device(s: &str) -> Result<DeviceOption, anyhow::Error> {
-    DeviceOption::from_str(s)
-}
+use crate::cli::{Cli, Pipeline};
+use crate::routes::{
+    feature_extraction, fill_mask, text_classification, text_generation, token_classification,
+    zero_shot_classification,
+};
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
+    // initialize tracing
+    tracing_subscriber::fmt::init();
+
+    // Parse the command line arguments
     let args = Cli::parse();
 
-    // Create a new router
-    let app = Router::new().route("/", get(root));
+    // Initialize the router based on the pipeline
+    let inference_router = match args.pipeline() {
+        Pipeline::FeatureExtraction => feature_extraction::router(&args)?,
+        Pipeline::FillMask => fill_mask::router(&args)?,
+        Pipeline::TextClassification => text_classification::router(&args)?,
+        Pipeline::TextGeneration => text_generation::router(&args)?,
+        Pipeline::TokenClassification => token_classification::router(&args)?,
+        Pipeline::ZeroShotClassification => zero_shot_classification::router(&args)?,
+    };
+    let router = Router::new().nest("/", inference_router);
 
-    let listener = tokio::net::TcpListener::bind(args.host).await.unwrap();
-    axum::serve(listener, app).await.unwrap();
-}
+    tracing::info!("Listening on {}", args.host());
+    let listener = tokio::net::TcpListener::bind(args.host()).await.unwrap();
+    axum::serve(listener, router).await.unwrap();
 
-async fn root() -> &'static str {
-    "Hello, World!"
+    Ok(())
 }
