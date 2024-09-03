@@ -77,7 +77,7 @@ impl Default for PaddingOptions {
 /// A thin wrapper around `tokenizers::Tokenizer` that provides additional functionality
 /// for encoding and decoding sequences and to automatically load the tokenizer from a Hugging Face
 /// Hub repository.
-pub trait Tokenizer: std::fmt::Debug {
+pub trait Tokenizer: std::fmt::Debug + Send + Sync {
     fn get_tokenizer(&self) -> &CoreTokenizer;
 
     // TODO: can we use `Arc` so we don't need to clone it?

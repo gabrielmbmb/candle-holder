@@ -155,7 +155,7 @@ impl ModelOutput {
 }
 
 /// Trait for a pre-trained model.
-pub trait PreTrainedModel {
+pub trait PreTrainedModel: Send + Sync {
     /// Loads a model from a `VarBuilder` containing the model's parameters and a model
     /// configuration.
     ///
