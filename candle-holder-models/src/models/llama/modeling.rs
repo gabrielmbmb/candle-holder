@@ -3,8 +3,8 @@ use std::sync::Arc;
 use candle_core::{DType, Device, Module, Tensor};
 use candle_holder::{Error, Result};
 use candle_nn::{
-    embedding, linear_no_bias, ops::softmax_last_dim, rms_norm, rotary_emb::rope, Dropout,
-    Embedding, Linear, RmsNorm, VarBuilder,
+    embedding, init::DEFAULT_KAIMING_NORMAL, linear_no_bias, ops::softmax_last_dim, rms_norm,
+    rotary_emb::rope, Dropout, Embedding, Linear, RmsNorm, VarBuilder,
 };
 
 use crate::{
@@ -414,11 +414,27 @@ pub struct LlamaForCausalLM {
     generation_config: GenerationConfig,
 }
 
+impl LlamaForCausalLM {
+    fn load_lm_head(vb: VarBuilder, config: &LlamaConfig) -> Result<Linear> {
+        let lm_head = if config.tie_word_embeddings.unwrap_or(false) {
+            let init_ws = DEFAULT_KAIMING_NORMAL;
+            let ws = vb
+                .pp("model.embed_tokens")
+                .get_with_hints((config.vocab_size, config.hidden_size), "weight", init_ws)?
+                .t()?;
+            Linear::new(ws, None)
+        } else {
+            linear_no_bias(config.hidden_size, config.vocab_size, vb.pp("lm_head"))?
+        };
+        Ok(lm_head)
+    }
+}
+
 impl PreTrainedModel for LlamaForCausalLM {
     fn load(vb: VarBuilder, config: serde_json::Value) -> Result<Self> {
         let config: LlamaConfig = serde_json::from_value(config)?;
         let model = Llama::load(vb.pp("model"), &config)?;
-        let lm_head = linear_no_bias(config.hidden_size, config.vocab_size, vb.pp("lm_head"))?;
+        let lm_head = Self::load_lm_head(vb, &config)?;
 
         Ok(Self {
             model,
@@ -435,7 +451,7 @@ impl PreTrainedModel for LlamaForCausalLM {
     ) -> Result<Self> {
         let config: LlamaConfig = serde_json::from_value(config)?;
         let model = Llama::load(vb.pp("model"), &config)?;
-        let lm_head = linear_no_bias(config.hidden_size, config.vocab_size, vb.pp("lm_head"))?;
+        let lm_head = Self::load_lm_head(vb, &config)?;
 
         Ok(Self {
             model,

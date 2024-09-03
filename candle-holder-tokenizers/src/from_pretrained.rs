@@ -29,6 +29,8 @@ lazy_static! {
         map.insert("roberta".to_string(), "RobertaTokenizer".to_string());
         map
     };
+    static ref IGNORE_TOKENIZER_CLASSES: Vec<&'static str> =
+        vec!["PreTrainedTokenizerFast", "GPT2Tokenizer"];
 }
 
 /// An enum representing the special tokens of a tokenizer.
@@ -174,7 +176,7 @@ impl TokenizerInfo {
     pub fn get_tokenizer_class(&self) -> &str {
         if let Some(config) = &self.config {
             if let Some(tokenizer_class) = &config.tokenizer_class {
-                if tokenizer_class != "PreTrainedTokenizerFast" {
+                if !IGNORE_TOKENIZER_CLASSES.contains(&tokenizer_class.as_str()) {
                     return tokenizer_class;
                 }
             }
