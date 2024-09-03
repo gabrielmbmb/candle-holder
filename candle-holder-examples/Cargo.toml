@@ -19,7 +19,7 @@ candle-core = { workspace = true }
 candle-nn = { workspace = true }
 accelerate-src = { workspace = true, optional = true }
 intel-mkl-src = { workspace = true, optional = true }
-anyhow = "1.0.86"
+anyhow = { workspace = true }
 clap = { workspace = true }
 
 [features]

@@ -5,6 +5,7 @@ members = [
     "candle-holder-models",
     "candle-holder-pipelines",
     "candle-holder-tokenizers",
+    "candle-holder-serve",
 ]
 resolver = "2"
 
@@ -18,6 +19,7 @@ categories = ["science"]
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
+anyhow = { version = "1.0.86" }
 candle-core = { git = "https://github.com/huggingface/candle", package = "candle-core" }
 candle-nn = { git = "https://github.com/huggingface/candle", package = "candle-nn" }
 candle-metal-kernels = { git = "https://github.com/huggingface/candle", package = "candle-metal-kernels" }
@@ -34,3 +36,7 @@ intel-mkl-src = { version = "0.8.1", features = ["mkl-static-lp64-iomp"] }
 minijinja = "2.2.0"
 minijinja-contrib = { version = "2.2.0", features = ["pycompat"] }
 clap = { version = "4.5.16", features = ["derive"] }
+axum = { version = "0.7.5", features = ["http2"] }
+tokio = { version = "1.40.0", features = ["full"] }
+tracing = { version = "0.1.40" }
+tracing-subscriber = { version = "0.3.18" }
