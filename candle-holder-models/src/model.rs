@@ -296,12 +296,15 @@ macro_rules! impl_from_pretrained_method {
                     .get_config()
                     .expect("Model config not found. Cannot load the model.")
                     .clone();
-                let dtype = dtype.unwrap_or(
+                let mut dtype = dtype.unwrap_or(
                     serde_json::from_value::<PretrainedConfig>(config.clone())
                         .expect("Could not parse model config.")
                         .get_dtype()
                         .unwrap_or($default_dtype),
                 );
+                if dtype == DType::BF16 && device.is_metal() {
+                    dtype = DType::F16;
+                }
                 let vb = model_info.get_var_builder(dtype, device)?;
                 if $load_generation_config {
                     Self::load_with_generation_config(
@@ -350,12 +353,15 @@ macro_rules! impl_auto_model_from_pretrained_method {
                 let model: Result<Box<dyn PreTrainedModel>> = match model_type {
                     $(
                         $model_type => {
-                            let dtype = dtype.unwrap_or(
+                            let mut dtype = dtype.unwrap_or(
                                 serde_json::from_value::<PretrainedConfig>(config.clone())
                                     .expect("Could not parse model config.")
                                     .get_dtype()
                                     .unwrap_or($default_dtype),
                             );
+                            if dtype == DType::BF16 && device.is_metal() {
+                                dtype = DType::F16;
+                            }
                             let vb = model_info.get_var_builder(dtype, device)?;
                             if $load_generation_config {
                                 Ok(Box::new($model_struct::load_with_generation_config(vb, config, model_info.get_generation_config().cloned())?))
