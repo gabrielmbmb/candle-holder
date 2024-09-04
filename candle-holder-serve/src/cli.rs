@@ -8,7 +8,7 @@ use std::str::FromStr;
 #[command(version, about, long_about = None)]
 pub(crate) struct Cli {
     /// The host to listen on.
-    #[arg(long, default_value = "0.0.0.0:3000")]
+    #[arg(long, default_value = "0.0.0.0:8080")]
     host: String,
 
     /// The Hugging Face repository id of the model to be loaded.
