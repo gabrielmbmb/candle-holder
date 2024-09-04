@@ -59,6 +59,9 @@ RUN apt-get update && apt-get install -y \
 
 COPY --from=builder /app/target/release/candle-holder-serve /usr/local/bin/candle-holder-serve
 
+COPY candle-holder-serve/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
-CMD ["candle-holder-serve"]
+ENTRYPOINT ["/entrypoint.sh"]
 
+ENV CANDLE_HOLDER_HOST=0.0.0.0:8080
