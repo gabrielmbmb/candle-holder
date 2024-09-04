@@ -1,13 +1,7 @@
-use anyhow::Result;
-use axum::{routing::post, Router};
 use candle_holder_pipelines::TextClassificationPipeline;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use tokio::sync::mpsc;
 
-use crate::cli::Cli;
-use crate::inference_endpoint::inference;
-use crate::workers::{task_distributor, InferenceState, InferenceTask, ProcessFn};
+use crate::generate_router;
 
 #[derive(Debug, Clone, Deserialize)]
 struct TextClassificationInferenceParams {
@@ -29,67 +23,32 @@ enum Inputs {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-struct TextClassificationInferenceRequest {
+pub(crate) struct TextClassificationInferenceRequest {
     inputs: Inputs,
     parameters: Option<TextClassificationInferenceParams>,
 }
 
 #[derive(Debug, Clone, Serialize)]
-struct TextClassificationResult {
+pub(crate) struct TextClassificationResult {
     label: String,
     score: f32,
 }
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
-enum TextClassificationInferenceResponse {
+pub(crate) enum TextClassificationInferenceResponse {
     Single(Vec<TextClassificationResult>),
     Multiple(Vec<Vec<TextClassificationResult>>),
 }
 
-pub fn router(args: &Cli) -> Result<Router> {
-    let model = args.model();
-    let device = args.device()?;
+generate_router!(
+    TextClassificationPipeline,
+    TextClassificationInferenceRequest,
+    TextClassificationInferenceResponse,
+    process_text_classification
+);
 
-    tracing::info!(
-        "Loading text classification pipeline for model '{}' on device {:?}",
-        model,
-        device
-    );
-
-    let pipeline = Arc::new(TextClassificationPipeline::new(
-        &args.model(),
-        &args.device()?,
-        None,
-        None,
-    )?);
-
-    let (tx, rx) = mpsc::channel::<
-        InferenceTask<TextClassificationInferenceRequest, TextClassificationInferenceResponse>,
-    >(32);
-
-    tokio::spawn(task_distributor::<
-        TextClassificationPipeline,
-        TextClassificationInferenceRequest,
-        TextClassificationInferenceResponse,
-        ProcessFn<
-            TextClassificationPipeline,
-            TextClassificationInferenceRequest,
-            TextClassificationInferenceResponse,
-        >,
-    >(
-        rx,
-        pipeline,
-        args.num_workers(),
-        Arc::new(process_text_classification),
-    ));
-
-    let state = InferenceState { tx };
-
-    Ok(Router::new().route("/", post(inference)).with_state(state))
-}
-
-fn process_text_classification(
+pub(crate) fn process_text_classification(
     pipeline: &TextClassificationPipeline,
     request: TextClassificationInferenceRequest,
 ) -> TextClassificationInferenceResponse {

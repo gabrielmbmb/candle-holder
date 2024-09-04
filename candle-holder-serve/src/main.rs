@@ -1,6 +1,7 @@
 mod cli;
 mod inference_endpoint;
 mod responses;
+mod router_macro;
 mod routes;
 mod workers;
 
