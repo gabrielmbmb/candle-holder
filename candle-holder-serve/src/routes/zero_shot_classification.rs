@@ -48,7 +48,7 @@ pub(crate) struct ZeroShotClassificationInferenceRequest {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub(crate) struct ZeroShotClassificationResult {
+pub(crate) struct ZeroShotClassificationInferenceResult {
     sequence: String,
     labels: Vec<String>,
     scores: Vec<f32>,
@@ -57,18 +57,18 @@ pub(crate) struct ZeroShotClassificationResult {
 #[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub(crate) enum ZeroShotClassificationInferenceResponse {
-    Single(ZeroShotClassificationResult),
-    Multiple(Vec<ZeroShotClassificationResult>),
+    Single(ZeroShotClassificationInferenceResult),
+    Multiple(Vec<ZeroShotClassificationInferenceResult>),
 }
 
 generate_router!(
     ZeroShotClassificationPipeline,
     ZeroShotClassificationInferenceRequest,
     ZeroShotClassificationInferenceResponse,
-    process_text_classification
+    process_zero_shot_classification
 );
 
-pub(crate) fn process_text_classification(
+pub(crate) fn process_zero_shot_classification(
     pipeline: &ZeroShotClassificationPipeline,
     request: ZeroShotClassificationInferenceRequest,
 ) -> ZeroShotClassificationInferenceResponse {
@@ -84,7 +84,7 @@ pub(crate) fn process_text_classification(
                 )
                 .unwrap();
             let (labels, scores): (Vec<String>, Vec<f32>) = output.into_iter().unzip();
-            let result = ZeroShotClassificationResult {
+            let result = ZeroShotClassificationInferenceResult {
                 sequence: text,
                 labels,
                 scores,
@@ -104,7 +104,7 @@ pub(crate) fn process_text_classification(
                 .zip(texts.into_iter())
                 .map(|(output, text)| {
                     let (labels, scores): (Vec<String>, Vec<f32>) = output.into_iter().unzip();
-                    ZeroShotClassificationResult {
+                    ZeroShotClassificationInferenceResult {
                         sequence: text,
                         labels,
                         scores,

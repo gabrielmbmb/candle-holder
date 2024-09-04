@@ -2,12 +2,16 @@ use candle_core::{DType, Device, IndexOp, Tensor, D};
 use candle_holder::{FromPretrainedParameters, Result};
 use candle_holder_models::{AutoModel, ForwardParams, PreTrainedModel};
 use candle_holder_tokenizers::{AutoTokenizer, BatchEncoding, Padding, PaddingOptions, Tokenizer};
+use serde::Deserialize;
 
 /// The pooling strategy that will be used to pool the outputs of the model.
+#[derive(Debug, Clone, Deserialize)]
 pub enum Pooling {
     /// Mean pooling.
+    #[serde(alias = "mean")]
     Mean,
     /// Use the CLS token.
+    #[serde(alias = "cls")]
     Cls,
 }
 
