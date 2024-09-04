@@ -110,11 +110,11 @@ impl TokenizerBuilder<RobertaTokenizer> for RobertaTokenizerBuilder {
         > = TokenizerImpl::new(self.build_model(vocab, merges)?);
 
         tokenizer
-            .with_pre_tokenizer(self.build_pre_tokenizer())
-            .with_post_processor(
+            .with_pre_tokenizer(Some(self.build_pre_tokenizer()))
+            .with_post_processor(Some(
                 self.build_post_processor((sep_token, sep_token_id), (cls_token, cls_token_id)),
-            )
-            .with_decoder(self.build_decoder());
+            ))
+            .with_decoder(Some(self.build_decoder()));
 
         Ok(CoreTokenizer::from(tokenizer))
     }

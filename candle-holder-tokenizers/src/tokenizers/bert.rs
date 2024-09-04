@@ -138,13 +138,13 @@ impl TokenizerBuilder<BertTokenizer> for BertTokenizerBuilder {
             .ok_or_else(|| Error::TokenizerMissingConfig)?;
 
         tokenizer
-            .with_normalizer(self.build_normalizer(tokenizer_config))
-            .with_pre_tokenizer(self.build_pre_tokenizer())
-            .with_post_processor(self.build_post_processor(
+            .with_normalizer(Some(self.build_normalizer(tokenizer_config)))
+            .with_pre_tokenizer(Some(self.build_pre_tokenizer()))
+            .with_post_processor(Some(self.build_post_processor(
                 (sep_token.clone(), sep_token_id),
                 (cls_token.clone(), cls_token_id),
-            )?)
-            .with_decoder(self.build_decoder());
+            )?))
+            .with_decoder(Some(self.build_decoder()));
 
         Ok(CoreTokenizer::from(tokenizer))
     }
