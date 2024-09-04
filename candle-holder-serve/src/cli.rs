@@ -22,6 +22,10 @@ pub struct Cli {
     /// The device to run the pipeline on.
     #[arg(short, long, value_parser = parse_device, default_value = "cpu")]
     device: DeviceOption,
+
+    /// The number of workers to use for inference.
+    #[arg(long, default_value = "1")]
+    num_workers: usize,
 }
 
 impl Cli {
@@ -35,6 +39,10 @@ impl Cli {
 
     pub fn pipeline(&self) -> &Pipeline {
         &self.pipeline
+    }
+
+    pub fn num_workers(&self) -> usize {
+        self.num_workers
     }
 
     /// Get the [`candle_core::Device`] corresponding to the selected device option.
