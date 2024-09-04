@@ -6,7 +6,7 @@ use std::str::FromStr;
 
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
-pub struct Cli {
+pub(crate) struct Cli {
     /// The host to listen on.
     #[arg(long, default_value = "0.0.0.0:3000")]
     host: String,
@@ -64,7 +64,7 @@ impl Cli {
 
 #[derive(Debug, Parser, Clone, Serialize, clap::ValueEnum)]
 #[serde(rename_all = "kebab-case")]
-pub enum Pipeline {
+pub(crate) enum Pipeline {
     FeatureExtraction,
     FillMask,
     TextClassification,
@@ -74,7 +74,7 @@ pub enum Pipeline {
 }
 
 #[derive(Debug, Clone, clap::ValueEnum)]
-pub enum DeviceOption {
+pub(crate) enum DeviceOption {
     Cpu,
     Metal,
     #[value(skip)]

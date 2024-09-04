@@ -1,4 +1,5 @@
 mod cli;
+mod inference_endpoint;
 mod responses;
 mod routes;
 mod workers;

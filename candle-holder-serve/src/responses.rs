@@ -7,7 +7,7 @@ use serde_json::json;
 
 /// A generic error response.
 #[derive(Debug)]
-pub struct ErrorResponse {
+pub(crate) struct ErrorResponse {
     /// The HTTP status code.
     code: StatusCode,
     /// The description of the error.

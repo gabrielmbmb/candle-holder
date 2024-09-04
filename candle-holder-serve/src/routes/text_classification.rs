@@ -1,14 +1,12 @@
 use anyhow::Result;
-use axum::extract::State;
-use axum::http::StatusCode;
-use axum::{routing::post, Json, Router};
+use axum::{routing::post, Router};
 use candle_holder_pipelines::TextClassificationPipeline;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::mpsc;
 
 use crate::cli::Cli;
-use crate::responses::ErrorResponse;
+use crate::inference_endpoint::inference;
 use crate::workers::{task_distributor, InferenceState, InferenceTask, ProcessFn};
 
 #[derive(Debug, Clone, Deserialize)]
@@ -89,35 +87,6 @@ pub fn router(args: &Cli) -> Result<Router> {
     let state = InferenceState { tx };
 
     Ok(Router::new().route("/", post(inference)).with_state(state))
-}
-
-async fn inference(
-    State(state): State<
-        InferenceState<TextClassificationInferenceRequest, TextClassificationInferenceResponse>,
-    >,
-    Json(req): Json<TextClassificationInferenceRequest>,
-) -> Result<Json<TextClassificationInferenceResponse>, ErrorResponse> {
-    let (resp_tx, resp_rx) = oneshot::channel();
-    let task = InferenceTask { req, resp_tx };
-
-    if let Err(e) = state.tx.send(task).await {
-        tracing::error!("Failed to send task to worker: {}", e);
-        return Err(ErrorResponse::new(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Failed to process request",
-        ));
-    }
-
-    match resp_rx.await {
-        Ok(response) => Ok(Json(response)),
-        Err(e) => {
-            tracing::error!("Failed to receive response from worker: {}", e);
-            Err(ErrorResponse::new(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Failed to process request",
-            ))
-        }
-    }
 }
 
 fn process_text_classification(

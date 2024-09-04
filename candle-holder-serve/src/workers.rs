@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 
 /// Task for the inference worker.
-pub struct InferenceTask<I, O> {
+pub(crate) struct InferenceTask<I, O> {
     /// The request to process.
     pub req: I,
     /// The response sender.
@@ -12,12 +12,12 @@ pub struct InferenceTask<I, O> {
 
 /// State for the inference task.
 #[derive(Clone)]
-pub struct InferenceState<I, O> {
+pub(crate) struct InferenceState<I, O> {
     pub tx: mpsc::Sender<InferenceTask<I, O>>,
 }
 
 /// Function signature for processing inference tasks.
-pub type ProcessFn<P, I, O> = dyn Fn(&P, I) -> O + Send + Sync;
+pub(crate) type ProcessFn<P, I, O> = dyn Fn(&P, I) -> O + Send + Sync;
 
 /// Distributes inference tasks to worker tasks that process them using the provided function. The
 /// function is expected to be thread-safe and is cloned for each worker.
@@ -28,7 +28,7 @@ pub type ProcessFn<P, I, O> = dyn Fn(&P, I) -> O + Send + Sync;
 /// * `pipeline` - The inference pipeline that is going to be used to process the tasks.
 /// * `num_workers` - The number of worker tasks to spawn.
 /// * `process_fn` - The function that processes the inference task.
-pub async fn task_distributor<P, I, O, F>(
+pub(crate) async fn task_distributor<P, I, O, F>(
     mut rx: mpsc::Receiver<InferenceTask<I, O>>,
     pipeline: Arc<P>,
     num_workers: usize,
