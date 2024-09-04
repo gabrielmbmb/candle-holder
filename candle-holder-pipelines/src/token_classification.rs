@@ -2,6 +2,7 @@ use candle_core::{DType, Device, IndexOp, Tensor, D};
 use candle_holder::{Error, FromPretrainedParameters, Result};
 use candle_holder_models::{AutoModelForTokenClassification, ForwardParams, PreTrainedModel};
 use candle_holder_tokenizers::{AutoTokenizer, BatchEncoding, Padding, PaddingOptions, Tokenizer};
+use serde::Deserialize;
 use std::collections::HashMap;
 use tokenizers::Encoding;
 
@@ -50,37 +51,41 @@ impl Entity {
         }
     }
 
-    pub fn get_word(&self) -> &str {
+    pub fn word(&self) -> &str {
         &self.word
     }
-
-    pub fn get_entity(&self) -> &str {
+    pub fn entity(&self) -> &str {
         &self.entity
     }
 
-    pub fn get_score(&self) -> f32 {
+    pub fn score(&self) -> f32 {
         self.score
     }
 
-    pub fn get_start(&self) -> usize {
+    pub fn start(&self) -> usize {
         self.start
     }
 
-    pub fn get_end(&self) -> usize {
+    pub fn end(&self) -> usize {
         self.end
     }
 
-    pub fn get_index(&self) -> usize {
+    pub fn index(&self) -> usize {
         self.index
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum AggregationStrategy {
+    #[serde(rename = "none")]
     None,
+    #[serde(rename = "simple")]
     Simple,
+    #[serde(rename = "first")]
     First,
+    #[serde(rename = "average")]
     Average,
+    #[serde(rename = "max")]
     Max,
 }
 

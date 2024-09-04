@@ -1,32 +1,123 @@
-use anyhow::Result;
-use axum::{routing::post, Router};
-use candle_holder_pipelines::TokenClassificationPipeline;
-use std::sync::Arc;
+use candle_holder_pipelines::{
+    AggregationStrategy, TokenClassificationOptions, TokenClassificationPipeline,
+};
+use serde::{Deserialize, Serialize};
 
-use crate::cli::Cli;
+use crate::generate_router;
 
-pub fn router(args: &Cli) -> Result<Router> {
-    let model = args.model();
-    let device = args.device()?;
-
-    tracing::info!(
-        "Loading token classification pipeline for model '{}' on device {:?}",
-        model,
-        device
-    );
-
-    let pipeline = Arc::new(TokenClassificationPipeline::new(
-        &args.model(),
-        &args.device()?,
-        None,
-        None,
-    )?);
-
-    Ok(Router::new()
-        .route("/", post(inference))
-        .with_state(pipeline))
+#[derive(Debug, Clone, Deserialize)]
+struct TokenClassificationInferenceParams {
+    aggregation_strategy: Option<AggregationStrategy>,
+    ignore_labels: Option<Vec<String>>,
 }
 
-async fn inference() -> &'static str {
-    "inference"
+impl Default for TokenClassificationInferenceParams {
+    fn default() -> Self {
+        Self {
+            aggregation_strategy: None,
+            ignore_labels: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+enum Inputs {
+    Single(String),
+    Multiple(Vec<String>),
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct TokenClassificationInferenceRequest {
+    inputs: Inputs,
+    parameters: Option<TokenClassificationInferenceParams>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct TokenClassificationResult {
+    entity: String,
+    score: f32,
+    index: usize,
+    word: String,
+    start: usize,
+    end: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(untagged)]
+pub(crate) enum TokenClassificationInferenceResponse {
+    Single(Vec<TokenClassificationResult>),
+    Multiple(Vec<Vec<TokenClassificationResult>>),
+}
+
+generate_router!(
+    TokenClassificationPipeline,
+    TokenClassificationInferenceRequest,
+    TokenClassificationInferenceResponse,
+    process_token_classification
+);
+
+pub(crate) fn process_token_classification(
+    pipeline: &TokenClassificationPipeline,
+    request: TokenClassificationInferenceRequest,
+) -> TokenClassificationInferenceResponse {
+    let params = request.parameters.unwrap_or_default();
+
+    match request.inputs {
+        Inputs::Single(text) => {
+            let outputs = pipeline
+                .run(
+                    text,
+                    Some(TokenClassificationOptions {
+                        aggregation_strategy: params
+                            .aggregation_strategy
+                            .unwrap_or(AggregationStrategy::None),
+                        ignore_labels: params.ignore_labels.unwrap_or_default(),
+                    }),
+                )
+                .unwrap();
+            let results = outputs
+                .into_iter()
+                .map(|output| TokenClassificationResult {
+                    entity: output.entity().to_string(),
+                    score: output.score(),
+                    index: output.index(),
+                    word: output.word().to_string(),
+                    start: output.start(),
+                    end: output.end(),
+                })
+                .collect::<Vec<_>>();
+            TokenClassificationInferenceResponse::Single(results)
+        }
+        Inputs::Multiple(texts) => {
+            let outputs = pipeline
+                .run_batch(
+                    texts,
+                    Some(TokenClassificationOptions {
+                        aggregation_strategy: params
+                            .aggregation_strategy
+                            .unwrap_or(AggregationStrategy::None),
+                        ignore_labels: params.ignore_labels.unwrap_or_default(),
+                    }),
+                )
+                .unwrap();
+            let results = outputs
+                .into_iter()
+                .map(|outputs| {
+                    outputs
+                        .into_iter()
+                        .map(|output| TokenClassificationResult {
+                            entity: output.entity().to_string(),
+                            score: output.score(),
+                            index: output.index(),
+                            word: output.word().to_string(),
+                            start: output.start(),
+                            end: output.end(),
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>();
+            TokenClassificationInferenceResponse::Multiple(results)
+        }
+    }
 }

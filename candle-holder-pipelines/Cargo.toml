@@ -20,6 +20,7 @@ candle-nn = { workspace = true }
 candle-metal-kernels = { workspace = true, optional = true }
 candle-flash-attn = { workspace = true, optional = true }
 dyn-fmt = { workspace = true }
+serde = { workspace = true }
 
 [features]
 metal = ["candle-core/metal", "candle-nn/metal", "candle-metal-kernels"]
