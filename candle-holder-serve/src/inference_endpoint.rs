@@ -1,4 +1,4 @@
-use axum::{extract::State, http::StatusCode, Json};
+use axum::{extract::State, Json};
 use tokio::sync::oneshot;
 
 use crate::{
@@ -7,7 +7,7 @@ use crate::{
 };
 
 pub(crate) async fn inference<I, O>(
-    State(state): State<InferenceState<I, O>>,
+    State(state): State<InferenceState<I, Result<O, ErrorResponse>>>,
     Json(req): Json<I>,
 ) -> Result<Json<O>, ErrorResponse> {
     let (resp_tx, resp_rx) = oneshot::channel();
@@ -15,20 +15,17 @@ pub(crate) async fn inference<I, O>(
 
     if let Err(e) = state.tx.send(task).await {
         tracing::error!("Failed to send task to worker: {}", e);
-        return Err(ErrorResponse::new(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Failed to process request",
-        ));
+        return Err(ErrorResponse::new(500, "Failed to process request"));
     }
 
     match resp_rx.await {
-        Ok(response) => Ok(Json(response)),
+        Ok(response) => match response {
+            Ok(response) => Ok(Json(response)),
+            Err(e) => Err(e),
+        },
         Err(e) => {
             tracing::error!("Failed to receive response from worker: {}", e);
-            Err(ErrorResponse::new(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Failed to process request",
-            ))
+            Err(ErrorResponse::new(500, "Failed to process request"))
         }
     }
 }

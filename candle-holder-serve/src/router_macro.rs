@@ -8,6 +8,7 @@ macro_rules! generate_router {
 
         use crate::cli::Cli;
         use crate::inference_endpoint::inference;
+        use crate::responses::ErrorResponse;
         use crate::workers::{task_distributor, InferenceState, InferenceTask, ProcessFn};
 
         pub fn router(args: &Cli) -> Result<Router> {
@@ -23,7 +24,8 @@ macro_rules! generate_router {
 
             let pipeline = Arc::new($pipeline::new(&args.model(), &args.device()?, None, None)?);
 
-            let (tx, rx) = mpsc::channel::<InferenceTask<$request, $response>>(32);
+            let (tx, rx) =
+                mpsc::channel::<InferenceTask<$request, Result<$response, ErrorResponse>>>(32);
 
             tokio::spawn(task_distributor::<
                 $pipeline,

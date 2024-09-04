@@ -1,6 +1,7 @@
 use std::sync::Arc;
-
 use tokio::sync::{mpsc, oneshot};
+
+use crate::responses::ErrorResponse;
 
 /// Task for the inference worker.
 pub(crate) struct InferenceTask<I, O> {
@@ -17,7 +18,7 @@ pub(crate) struct InferenceState<I, O> {
 }
 
 /// Function signature for processing inference tasks.
-pub(crate) type ProcessFn<P, I, O> = dyn Fn(&P, I) -> O + Send + Sync;
+pub(crate) type ProcessFn<P, I, O> = dyn Fn(&P, I) -> Result<O, ErrorResponse> + Send + Sync;
 
 /// Distributes inference tasks to worker tasks that process them using the provided function. The
 /// function is expected to be thread-safe and is cloned for each worker.
@@ -29,7 +30,7 @@ pub(crate) type ProcessFn<P, I, O> = dyn Fn(&P, I) -> O + Send + Sync;
 /// * `num_workers` - The number of worker tasks to spawn.
 /// * `process_fn` - The function that processes the inference task.
 pub(crate) async fn task_distributor<P, I, O, F>(
-    mut rx: mpsc::Receiver<InferenceTask<I, O>>,
+    mut rx: mpsc::Receiver<InferenceTask<I, Result<O, ErrorResponse>>>,
     pipeline: Arc<P>,
     num_workers: usize,
     process_fn: Arc<ProcessFn<P, I, O>>,
@@ -58,7 +59,8 @@ pub(crate) async fn task_distributor<P, I, O, F>(
     drop(worker_tx);
 
     let mut tasks = Vec::new();
-    let mut available_workers: Vec<mpsc::Sender<InferenceTask<I, O>>> = Vec::new();
+    let mut available_workers: Vec<mpsc::Sender<InferenceTask<I, Result<O, ErrorResponse>>>> =
+        Vec::new();
 
     loop {
         tokio::select! {
@@ -105,13 +107,12 @@ pub(crate) async fn task_distributor<P, I, O, F>(
 ///
 /// # Arguments
 ///
-/// * `id` - Worker task identifier.
 /// * `pipeline` - The inference pipeline that is going to be used to process the tasks.
 /// * `worker_tx` - Sender to communicate with the task distributor.
 /// * `process_fn` - The function that processes the inference task.
 async fn worker_loop<P, I, O, F: ?Sized>(
     pipeline: Arc<P>,
-    worker_tx: mpsc::Sender<mpsc::Sender<InferenceTask<I, O>>>,
+    worker_tx: mpsc::Sender<mpsc::Sender<InferenceTask<I, Result<O, ErrorResponse>>>>,
     process_fn: Arc<ProcessFn<P, I, O>>,
 ) {
     let (task_tx, mut task_rx) = mpsc::channel(1);

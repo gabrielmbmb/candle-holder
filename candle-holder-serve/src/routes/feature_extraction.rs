@@ -59,19 +59,27 @@ generate_router!(
 pub(crate) fn process_feature_extraction(
     pipeline: &FeatureExtractionPipeline,
     request: FeatureExtractionInferenceRequest,
-) -> FeatureExtractionInferenceResponse {
+) -> Result<FeatureExtractionInferenceResponse, ErrorResponse> {
     let params = request.parameters.unwrap_or_default();
 
     match request.inputs {
         Inputs::Single(text) => {
-            let output = pipeline.run(text, Some(params.into())).unwrap();
+            let output = pipeline.run(text, Some(params.into())).map_err(|e| {
+                tracing::error!("Failed to run pipeline on batch: {}", e);
+                ErrorResponse::new(500, format!("Failed to run pipeline: {}", e))
+            })?;
             let result = output.to_vec1::<f32>().unwrap();
-            FeatureExtractionInferenceResponse::Single(result)
+            Ok(FeatureExtractionInferenceResponse::Single(result))
         }
         Inputs::Multiple(texts) => {
-            let outputs = pipeline.run_batch(texts, Some(params.into())).unwrap();
+            let outputs = pipeline
+                .run_batch(texts, Some(params.into()))
+                .map_err(|e| {
+                    tracing::error!("Failed to run pipeline on batch: {}", e);
+                    ErrorResponse::new(500, format!("Failed to run pipeline on batch: {}", e))
+                })?;
             let results = outputs.to_vec2::<f32>().unwrap();
-            FeatureExtractionInferenceResponse::Multiple(results)
+            Ok(FeatureExtractionInferenceResponse::Multiple(results))
         }
     }
 }

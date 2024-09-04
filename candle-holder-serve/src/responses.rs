@@ -3,19 +3,20 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
+use serde::Serialize;
 use serde_json::json;
 
 /// A generic error response.
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize)]
 pub(crate) struct ErrorResponse {
     /// The HTTP status code.
-    code: StatusCode,
+    code: u16,
     /// The description of the error.
     message: String,
 }
 
 impl ErrorResponse {
-    pub fn new(code: StatusCode, message: impl Into<String>) -> Self {
+    pub fn new(code: u16, message: impl Into<String>) -> Self {
         Self {
             code,
             message: message.into(),
@@ -27,11 +28,10 @@ impl IntoResponse for ErrorResponse {
     fn into_response(self) -> Response {
         let body = Json(json!({
             "error": {
-                "code": self.code.as_u16(),
                 "message": self.message,
             }
         }));
 
-        (self.code, body).into_response()
+        (StatusCode::from_u16(self.code).unwrap(), body).into_response()
     }
 }

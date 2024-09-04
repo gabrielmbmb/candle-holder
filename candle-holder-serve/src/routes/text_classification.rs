@@ -51,20 +51,26 @@ generate_router!(
 pub(crate) fn process_text_classification(
     pipeline: &TextClassificationPipeline,
     request: TextClassificationInferenceRequest,
-) -> TextClassificationInferenceResponse {
+) -> Result<TextClassificationInferenceResponse, ErrorResponse> {
     let params = request.parameters.unwrap_or_default();
 
     match request.inputs {
         Inputs::Single(text) => {
-            let outputs = pipeline.run(text, Some(params.top_k)).unwrap();
+            let outputs = pipeline.run(text, Some(params.top_k)).map_err(|e| {
+                tracing::error!("Failed to run pipeline: {}", e);
+                ErrorResponse::new(500, "Failed to process request")
+            })?;
             let results = outputs
                 .into_iter()
                 .map(|(label, score)| TextClassificationResult { label, score })
                 .collect();
-            TextClassificationInferenceResponse::Single(results)
+            Ok(TextClassificationInferenceResponse::Single(results))
         }
         Inputs::Multiple(texts) => {
-            let outputs = pipeline.run_batch(texts, Some(params.top_k)).unwrap();
+            let outputs = pipeline.run_batch(texts, Some(params.top_k)).map_err(|e| {
+                tracing::error!("Failed to run pipeline on batch: {}", e);
+                ErrorResponse::new(500, "Failed to process request")
+            })?;
             let results = outputs
                 .into_iter()
                 .map(|output| {
@@ -74,7 +80,7 @@ pub(crate) fn process_text_classification(
                         .collect()
                 })
                 .collect();
-            TextClassificationInferenceResponse::Multiple(results)
+            Ok(TextClassificationInferenceResponse::Multiple(results))
         }
     }
 }

@@ -71,7 +71,7 @@ generate_router!(
 pub(crate) fn process_zero_shot_classification(
     pipeline: &ZeroShotClassificationPipeline,
     request: ZeroShotClassificationInferenceRequest,
-) -> ZeroShotClassificationInferenceResponse {
+) -> Result<ZeroShotClassificationInferenceResponse, ErrorResponse> {
     let params = request.parameters.unwrap_or_default();
 
     match request.inputs {
@@ -82,14 +82,17 @@ pub(crate) fn process_zero_shot_classification(
                     params.candidate_labels.clone(),
                     Some(params.into()),
                 )
-                .unwrap();
+                .map_err(|e| {
+                    tracing::error!("Failed to run pipeline on batch: {}", e);
+                    ErrorResponse::new(500, format!("Failed to run pipeline: {}", e))
+                })?;
             let (labels, scores): (Vec<String>, Vec<f32>) = output.into_iter().unzip();
             let result = ZeroShotClassificationInferenceResult {
                 sequence: text,
                 labels,
                 scores,
             };
-            ZeroShotClassificationInferenceResponse::Single(result)
+            Ok(ZeroShotClassificationInferenceResponse::Single(result))
         }
         Inputs::Multiple(texts) => {
             let outputs = pipeline
@@ -98,7 +101,10 @@ pub(crate) fn process_zero_shot_classification(
                     params.candidate_labels.clone(),
                     Some(params.into()),
                 )
-                .unwrap();
+                .map_err(|e| {
+                    tracing::error!("Failed to run pipeline on batch: {}", e);
+                    ErrorResponse::new(500, format!("Failed to run pipeline: {}", e))
+                })?;
             let results = outputs
                 .into_iter()
                 .zip(texts.into_iter())
@@ -111,7 +117,7 @@ pub(crate) fn process_zero_shot_classification(
                     }
                 })
                 .collect();
-            ZeroShotClassificationInferenceResponse::Multiple(results)
+            Ok(ZeroShotClassificationInferenceResponse::Multiple(results))
         }
     }
 }

@@ -60,7 +60,7 @@ generate_router!(
 pub(crate) fn process_token_classification(
     pipeline: &TokenClassificationPipeline,
     request: TokenClassificationInferenceRequest,
-) -> TokenClassificationInferenceResponse {
+) -> Result<TokenClassificationInferenceResponse, ErrorResponse> {
     let params = request.parameters.unwrap_or_default();
 
     match request.inputs {
@@ -75,7 +75,10 @@ pub(crate) fn process_token_classification(
                         ignore_labels: params.ignore_labels.unwrap_or_default(),
                     }),
                 )
-                .unwrap();
+                .map_err(|e| {
+                    tracing::error!("Failed to run pipeline: {}", e);
+                    ErrorResponse::new(500, "Failed to process request")
+                })?;
             let results = outputs
                 .into_iter()
                 .map(|output| TokenClassificationResult {
@@ -87,7 +90,7 @@ pub(crate) fn process_token_classification(
                     end: output.end(),
                 })
                 .collect::<Vec<_>>();
-            TokenClassificationInferenceResponse::Single(results)
+            Ok(TokenClassificationInferenceResponse::Single(results))
         }
         Inputs::Multiple(texts) => {
             let outputs = pipeline
@@ -100,7 +103,10 @@ pub(crate) fn process_token_classification(
                         ignore_labels: params.ignore_labels.unwrap_or_default(),
                     }),
                 )
-                .unwrap();
+                .map_err(|e| {
+                    tracing::error!("Failed to run pipeline: {}", e);
+                    ErrorResponse::new(500, "Failed to process request")
+                })?;
             let results = outputs
                 .into_iter()
                 .map(|outputs| {
@@ -117,7 +123,7 @@ pub(crate) fn process_token_classification(
                         .collect::<Vec<_>>()
                 })
                 .collect::<Vec<_>>();
-            TokenClassificationInferenceResponse::Multiple(results)
+            Ok(TokenClassificationInferenceResponse::Multiple(results))
         }
     }
 }

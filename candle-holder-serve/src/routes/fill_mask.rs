@@ -53,7 +53,7 @@ generate_router!(
 pub(crate) fn process_feature_extraction(
     pipeline: &FillMaskPipeline,
     request: FillMaskInferenceRequest,
-) -> FillMaskInferenceResponse {
+) -> Result<FillMaskInferenceResponse, ErrorResponse> {
     let params = request.parameters.unwrap_or_default();
 
     match request.inputs {
@@ -65,7 +65,10 @@ pub(crate) fn process_feature_extraction(
                         top_k: params.top_k,
                     }),
                 )
-                .unwrap();
+                .map_err(|e| {
+                    tracing::error!("Failed to run pipeline: {}", e);
+                    ErrorResponse::new(400, e.to_string())
+                })?;
             let result: Vec<Vec<FillMaskResult>> = output
                 .into_iter()
                 .map(|mask_results| {
@@ -80,7 +83,7 @@ pub(crate) fn process_feature_extraction(
                         .collect()
                 })
                 .collect();
-            FillMaskInferenceResponse::Single(result)
+            Ok(FillMaskInferenceResponse::Single(result))
         }
         Inputs::Multiple(texts) => {
             let outputs = pipeline
@@ -90,7 +93,10 @@ pub(crate) fn process_feature_extraction(
                         top_k: params.top_k,
                     }),
                 )
-                .unwrap();
+                .map_err(|e| {
+                    tracing::error!("Failed to run pipeline on batch: {}", e);
+                    ErrorResponse::new(400, e.to_string())
+                })?;
             let results: Vec<Vec<Vec<FillMaskResult>>> = outputs
                 .into_iter()
                 .map(|input_mask_results| {
@@ -110,7 +116,7 @@ pub(crate) fn process_feature_extraction(
                         .collect()
                 })
                 .collect();
-            FillMaskInferenceResponse::Multiple(results)
+            Ok(FillMaskInferenceResponse::Multiple(results))
         }
     }
 }
