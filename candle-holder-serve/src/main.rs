@@ -6,6 +6,7 @@ mod routes;
 mod workers;
 
 use anyhow::Result;
+use axum::routing::get;
 use axum::Router;
 use clap::Parser;
 
@@ -32,11 +33,17 @@ async fn main() -> Result<()> {
         Pipeline::TokenClassification => token_classification::router(&args)?,
         Pipeline::ZeroShotClassification => zero_shot_classification::router(&args)?,
     };
-    let router = Router::new().nest("/", inference_router);
+    let router = Router::new()
+        .nest("/", inference_router)
+        .route("/health", get(health));
 
     tracing::info!("Listening on {}", args.host());
     let listener = tokio::net::TcpListener::bind(args.host()).await.unwrap();
     axum::serve(listener, router).await.unwrap();
 
     Ok(())
+}
+
+async fn health() -> &'static str {
+    "OK"
 }
