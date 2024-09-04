@@ -1,3 +1,9 @@
+#[cfg(feature = "accelerate")]
+extern crate accelerate_src;
+
+#[cfg(feature = "mkl")]
+extern crate intel_mkl_src;
+
 use anyhow::{Error, Result};
 use candle_holder_examples::Cli;
 use candle_holder_models::{

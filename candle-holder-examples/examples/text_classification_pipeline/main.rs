@@ -1,3 +1,9 @@
+#[cfg(feature = "accelerate")]
+extern crate accelerate_src;
+
+#[cfg(feature = "mkl")]
+extern crate intel_mkl_src;
+
 use anyhow::Result;
 use candle_holder_examples::get_device_from_args;
 use candle_holder_pipelines::TextClassificationPipeline;
