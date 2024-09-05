@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use candle_core::Device;
+use candle_core::{DType, Device};
 use clap::Parser;
 use serde::Serialize;
 use std::str::FromStr;
@@ -22,6 +22,10 @@ pub(crate) struct Cli {
     /// The device to run the pipeline on.
     #[arg(short, long, value_parser = parse_device, default_value = "cpu")]
     device: DeviceOption,
+
+    /// The dtype to load the model weights with.
+    #[arg(long)]
+    dtype: Option<DTypeOption>,
 
     /// The number of workers to use for inference.
     #[arg(long, default_value = "1")]
@@ -60,6 +64,15 @@ impl Cli {
             _ => Err(anyhow!("Requested device is not available")),
         }
     }
+
+    /// Get the [`candle_core::DType`] corresponding to the selected dtype option.
+    pub fn dtype(&self) -> Option<DType> {
+        self.dtype.as_ref().map(|dtype| match dtype {
+            DTypeOption::Float16 => DType::F16,
+            DTypeOption::BFloat16 => DType::BF16,
+            DTypeOption::Float32 => DType::F32,
+        })
+    }
 }
 
 #[derive(Debug, Parser, Clone, Serialize, clap::ValueEnum)]
@@ -79,6 +92,14 @@ pub(crate) enum DeviceOption {
     Metal,
     #[value(skip)]
     Cuda(usize),
+}
+
+#[derive(Debug, Clone, clap::ValueEnum)]
+#[clap(rename_all = "lowercase")]
+pub(crate) enum DTypeOption {
+    Float16,
+    BFloat16,
+    Float32,
 }
 
 impl FromStr for DeviceOption {
