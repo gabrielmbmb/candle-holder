@@ -302,7 +302,7 @@ macro_rules! impl_from_pretrained_method {
                         .get_dtype()
                         .unwrap_or($default_dtype),
                 );
-                if dtype == DType::BF16 && device.is_metal() {
+                if dtype == DType::BF16 && (device.is_metal() || device.is_cpu()) {
                     dtype = DType::F16;
                 }
                 let vb = model_info.get_var_builder(dtype, device)?;
@@ -359,7 +359,7 @@ macro_rules! impl_auto_model_from_pretrained_method {
                                     .get_dtype()
                                     .unwrap_or($default_dtype),
                             );
-                            if dtype == DType::BF16 && device.is_metal() {
+                            if dtype == DType::BF16 && (device.is_metal() || device.is_cpu()) {
                                 dtype = DType::F16;
                             }
                             let vb = model_info.get_var_builder(dtype, device)?;
