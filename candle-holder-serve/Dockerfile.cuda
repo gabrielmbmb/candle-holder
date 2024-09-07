@@ -1,0 +1,53 @@
+# Based on https://github.com/huggingface/text-embeddings-inference/blob/main/Dockerfile-cuda-all
+FROM nvidia/cuda:12.5.1-cudnn-devel-ubuntu22.04 AS base-builder
+
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+RUN apt-get update && apt-get install -y \
+  curl \
+  libssl-dev \
+  pkg-config \
+  nvidia-utils-525 \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
+RUN cargo install cargo-chef --locked
+
+FROM base-builder AS planner
+
+WORKDIR /app
+
+COPY . .
+
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM base-builder AS builder
+
+WORKDIR /app
+
+COPY --from=planner /app/recipe.json recipe.json
+
+# consolidate
+RUN for compute_cap in 75 80 90; do \
+  CUDA_COMPUTE_CAP=$compute_cap cargo chef cook --release --recipe-path recipe.json; \
+  done
+
+COPY . .
+
+RUN for cap in 75 80 90; do \
+  CUDA_COMPUTE_CAP=$cap cargo build --release --package candle-holder-serve --features cuda,flash-attn && \
+  mv target/release/candle-holder-serve target/release/candle-holder-serve-cuda$cap; \
+  done
+
+FROM nvidia/cuda:12.5.1-cudnn-runtime-ubuntu22.04
+
+COPY --from=builder /app/target/release/candle-holder-serve-cuda75 /usr/local/bin/candle-holder-serve-cuda75
+COPY --from=builder /app/target/release/candle-holder-serve-cuda80 /usr/local/bin/candle-holder-serve-cuda80
+COPY --from=builder /app/target/release/candle-holder-serve-cuda90 /usr/local/bin/candle-holder-serve-cuda90
+
+COPY candle-holder-serve/entrypoint-cuda.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
+
+ENV CANDLE_HOLDER_HOST=0.0.0.0:8080

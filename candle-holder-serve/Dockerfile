@@ -7,20 +7,24 @@ RUN cargo chef prepare --recipe-path recipe.json
 
 FROM chef AS builder
 
-# Define build argument
-ARG BUILD_TARGET=cpu
 ARG TARGETARCH
 ARG TARGETOS
 
-# Install build essentials
 RUN apt-get update && apt-get install -y \
-    build-essential \
-    pkg-config \
-    libssl-dev \
-    && if [ "$TARGETARCH" != "arm64" ]; then \
-    apt-get install -y intel-mkl-full; \
-    fi \
-    && rm -rf /var/lib/apt/lists/*
+  build-essential \
+  pkg-config \
+  libssl-dev \
+  wget \
+  gnupg \
+  && if [ "$TARGETARCH" != "arm64" ]; then \
+  wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB \
+  | gpg --dearmor | tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null \
+  && echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" \
+  | tee /etc/apt/sources.list.d/oneAPI.list \
+  && apt-get update \
+  && apt-get install -y intel-oneapi-mkl-devel; \
+  fi \
+  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -31,18 +35,14 @@ RUN cargo chef cook --release --recipe-path recipe.json
 COPY . .
 
 ENV RUSTFLAGS="-C target-cpu=native"
-ENV OPENBLAS_NUM_THREADS=1
-ENV BLAS_LIB=OpenBLAS
 
 RUN if [ "$TARGETOS" = "darwin" ] && [ "$TARGETARCH" = "arm64" ]; then \
-    cargo build --release --package candle-holder-serve --features accelerate; \
-    elif [ "$TARGETARCH" = "arm64" ]; then \
-    cargo build --release --package candle-holder-serve; \
-    elif [ "$BUILD_TARGET" = "gpu" ]; then \
-    cargo build --release --package candle-holder-serve --features gpu; \
-    else \
-    cargo build --release --package candle-holder-serve --features mkl; \
-    fi
+  cargo build --release --package candle-holder-serve --features accelerate; \
+  elif [ "$TARGETARCH" = "arm64" ]; then \
+  cargo build --release --package candle-holder-serve; \
+  else \
+  cargo build --release --package candle-holder-serve --features mkl; \
+  fi
 
 FROM ubuntu:22.04
 
@@ -50,12 +50,8 @@ ARG TARGETARCH
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
-    libssl3 \
-    ca-certificates \
-    && if [ "$TARGETARCH" != "arm64" ]; then \
-    apt-get install -y intel-mkl-full; \
-    fi \
-    && rm -rf /var/lib/apt/lists/*
+  libomp-dev \
+  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/target/release/candle-holder-serve /usr/local/bin/candle-holder-serve
 

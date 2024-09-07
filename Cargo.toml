@@ -20,10 +20,10 @@ license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
 anyhow = { version = "1.0.86" }
-candle-core = { version = "0.6.0" }
-candle-nn = { version = "0.6.0" }
-candle-metal-kernels = { version = "0.6.0" }
-candle-flash-attn = { version = "0.6.0" }
+candle-core = { git = "https://github.com/huggingface/candle", package = "candle-core" }
+candle-nn = { git = "https://github.com/huggingface/candle", package = "candle-nn" }
+candle-metal-kernels = { git = "https://github.com/huggingface/candle", package = "candle-metal-kernels" }
+candle-flash-attn = { git = "https://github.com/huggingface/candle", package = "candle-flash-attn" }
 dyn-fmt = "0.4.0"
 hf-hub = "0.3.2"
 lazy_static = "1.4.0"

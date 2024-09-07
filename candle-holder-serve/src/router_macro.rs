@@ -14,15 +14,18 @@ macro_rules! generate_router {
         pub fn router(args: &Cli) -> Result<Router> {
             let model = args.model();
             let device = args.device()?;
+            let dtype = args.dtype();
+            let dtype_str = dtype.map_or("default".to_string(), |dt| format!("{:?}", dt));
 
             tracing::info!(
-                "Loading {} for model '{}' on device {:?}",
+                "Loading {} for model '{}' on device {:?} with dtype {}",
                 stringify!($pipeline),
                 model,
-                device
+                device,
+                dtype_str
             );
 
-            let pipeline = Arc::new($pipeline::new(&args.model(), &args.device()?, None, None)?);
+            let pipeline = Arc::new($pipeline::new(&args.model(), &args.device()?, dtype, None)?);
 
             let (tx, rx) =
                 mpsc::channel::<InferenceTask<$request, Result<$response, ErrorResponse>>>(32);
