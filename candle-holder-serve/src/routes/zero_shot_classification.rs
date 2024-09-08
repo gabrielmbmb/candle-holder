@@ -65,7 +65,8 @@ generate_router!(
     ZeroShotClassificationPipeline,
     ZeroShotClassificationInferenceRequest,
     ZeroShotClassificationInferenceResponse,
-    process_zero_shot_classification
+    process_zero_shot_classification,
+    zero_shot_classification_warm_up
 );
 
 pub(crate) fn process_zero_shot_classification(
@@ -120,4 +121,11 @@ pub(crate) fn process_zero_shot_classification(
             Ok(ZeroShotClassificationInferenceResponse::Multiple(results))
         }
     }
+}
+
+pub(crate) fn zero_shot_classification_warm_up(
+    pipeline: &ZeroShotClassificationPipeline,
+) -> Result<()> {
+    pipeline.run("Hello, world!", vec!["world"], None)?;
+    Ok(())
 }

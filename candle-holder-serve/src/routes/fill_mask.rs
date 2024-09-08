@@ -47,7 +47,8 @@ generate_router!(
     FillMaskPipeline,
     FillMaskInferenceRequest,
     FillMaskInferenceResponse,
-    process_feature_extraction
+    process_feature_extraction,
+    fill_mask_warm_up
 );
 
 pub(crate) fn process_feature_extraction(
@@ -119,4 +120,9 @@ pub(crate) fn process_feature_extraction(
             Ok(FillMaskInferenceResponse::Multiple(results))
         }
     }
+}
+
+pub(crate) fn fill_mask_warm_up(pipeline: &FillMaskPipeline) -> Result<()> {
+    pipeline.run("Hello, my name is [MASK].", None)?;
+    Ok(())
 }

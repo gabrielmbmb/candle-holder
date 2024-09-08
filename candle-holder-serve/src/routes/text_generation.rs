@@ -65,7 +65,8 @@ generate_router!(
     TextGenerationPipeline,
     TextGenerationInferenceRequest,
     TextGenerationInferenceResponse,
-    process_text_generation
+    process_text_generation,
+    text_generation_warm_up
 );
 
 pub(crate) fn process_text_generation(
@@ -125,4 +126,9 @@ pub(crate) fn process_text_generation(
             Ok(TextGenerationInferenceResponse::Multiple(results))
         }
     }
+}
+
+pub(crate) fn text_generation_warm_up(pipeline: &TextGenerationPipeline) -> Result<()> {
+    pipeline.run("warm up", None)?;
+    Ok(())
 }

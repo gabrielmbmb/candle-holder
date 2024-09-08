@@ -53,7 +53,8 @@ generate_router!(
     FeatureExtractionPipeline,
     FeatureExtractionInferenceRequest,
     FeatureExtractionInferenceResponse,
-    process_feature_extraction
+    process_feature_extraction,
+    feature_extraction_warm_up
 );
 
 pub(crate) fn process_feature_extraction(
@@ -82,4 +83,12 @@ pub(crate) fn process_feature_extraction(
             Ok(FeatureExtractionInferenceResponse::Multiple(results))
         }
     }
+}
+
+pub(crate) fn feature_extraction_warm_up(pipeline: &FeatureExtractionPipeline) -> Result<()> {
+    pipeline.run(
+        "This is a sample text to warm up the feature extraction pipeline.",
+        None,
+    )?;
+    Ok(())
 }

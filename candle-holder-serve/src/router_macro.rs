@@ -1,6 +1,6 @@
 #[macro_export]
 macro_rules! generate_router {
-    ($pipeline:ident, $request:ident, $response:ident, $process_fn:expr) => {
+    ($pipeline:ident, $request:ident, $response:ident, $process_fn:expr, $warm_up_fn:expr) => {
         use anyhow::Result;
         use axum::{routing::post, Router};
         use std::sync::Arc;
@@ -26,6 +26,11 @@ macro_rules! generate_router {
             );
 
             let pipeline = Arc::new($pipeline::new(&args.model(), &args.device()?, dtype, None)?);
+
+            tracing::info!("Warming up the model...");
+            $warm_up_fn(&pipeline).unwrap_or_else(|e| {
+                tracing::error!("Failed to warm up the model: {}", e);
+            });
 
             let (tx, rx) =
                 mpsc::channel::<InferenceTask<$request, Result<$response, ErrorResponse>>>(32);

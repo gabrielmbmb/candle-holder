@@ -45,7 +45,8 @@ generate_router!(
     TextClassificationPipeline,
     TextClassificationInferenceRequest,
     TextClassificationInferenceResponse,
-    process_text_classification
+    process_text_classification,
+    text_classification_warm_up
 );
 
 pub(crate) fn process_text_classification(
@@ -83,4 +84,9 @@ pub(crate) fn process_text_classification(
             Ok(TextClassificationInferenceResponse::Multiple(results))
         }
     }
+}
+
+pub(crate) fn text_classification_warm_up(pipeline: &TextClassificationPipeline) -> Result<()> {
+    pipeline.run("warm up", None)?;
+    Ok(())
 }

@@ -54,7 +54,8 @@ generate_router!(
     TokenClassificationPipeline,
     TokenClassificationInferenceRequest,
     TokenClassificationInferenceResponse,
-    process_token_classification
+    process_token_classification,
+    token_classification_warm_up
 );
 
 pub(crate) fn process_token_classification(
@@ -126,4 +127,9 @@ pub(crate) fn process_token_classification(
             Ok(TokenClassificationInferenceResponse::Multiple(results))
         }
     }
+}
+
+pub(crate) fn token_classification_warm_up(pipeline: &TokenClassificationPipeline) -> Result<()> {
+    pipeline.run("warm up", None)?;
+    Ok(())
 }
