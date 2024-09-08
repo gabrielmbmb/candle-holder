@@ -8,7 +8,7 @@ use crate::generation::config::GenerationConfig;
 
 /// An enum containing the available sampling strategies for selecting the next token id of a
 /// sequence using the outputs logits of an auto-regressive model.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum SamplingStrategy {
     /// Greedy sampling selects the token with the highest probability.
     Greedy,
@@ -104,7 +104,7 @@ impl LogitSampler {
     ///
     /// The ID of the sampled token.
     pub fn sample(&mut self, logits: &Tensor) -> Result<u32> {
-        if self.temperature.is_none() {
+        if self.strategy == SamplingStrategy::Greedy || self.temperature.is_none() {
             return Ok(logits.argmax(D::Minus1)?.to_scalar()?);
         }
 
