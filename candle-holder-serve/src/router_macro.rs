@@ -32,8 +32,9 @@ macro_rules! generate_router {
                 tracing::error!("Failed to warm up the model: {}", e);
             });
 
+            tracing::info!("Channel buffer size: {}", args.buffer_size());
             let (tx, rx) =
-                mpsc::channel::<InferenceTask<$request, Result<$response, ErrorResponse>>>(32);
+                mpsc::channel::<InferenceTask<$request, Result<$response, ErrorResponse>>>(args.buffer_size());
 
             tokio::spawn(task_distributor::<
                 $pipeline,

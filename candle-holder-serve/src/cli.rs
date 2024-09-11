@@ -30,6 +30,10 @@ pub(crate) struct Cli {
     /// The number of workers to use for inference.
     #[arg(long, default_value = "1")]
     num_workers: usize,
+
+    /// Channel buffer size for the inference worker.
+    #[arg(long, default_value = "32")]
+    buffer_size: usize,
 }
 
 impl Cli {
@@ -47,6 +51,10 @@ impl Cli {
 
     pub fn num_workers(&self) -> usize {
         self.num_workers
+    }
+
+    pub fn buffer_size(&self) -> usize {
+        self.buffer_size
     }
 
     /// Get the [`candle_core::Device`] corresponding to the selected device option.
