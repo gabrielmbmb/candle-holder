@@ -23,6 +23,14 @@ if [ ! -z "$CANDLE_HOLDER_DTYPE" ]; then
   ARGS+=("--dtype" "$CANDLE_HOLDER_DTYPE")
 fi
 
+if [ ! -z "$CANDLE_HOLDER_NUM_WORKERS" ]; then
+  ARGS+=("--num-workers" "$CANDLE_HOLDER_NUM_WORKERS")
+fi
+
+if [ ! -z "$CANDLE_HOLDER_BUFFER_SIZE" ]; then
+  ARGS+=("--buffer-size" "$CANDLE_HOLDER_BUFFER_SIZE")
+fi
+
 CANDLE_HOLDER_HOST=${CANDLE_HOLDER_HOST:-0.0.0.0:8080}
 ARGS+=("--host" "$CANDLE_HOLDER_HOST")
 
