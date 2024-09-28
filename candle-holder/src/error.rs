@@ -26,6 +26,8 @@ pub enum Error {
     // -----------------------------------
     // From pretrained errors
     // -----------------------------------
+    #[error("Repository '{0}' not found.")]
+    RepositoryNotFound(String),
     #[error("Model '{0}' is not implemented. Create a new issue in 'https://github.com/gabrielmbmb/candle-holder' to request the implementation.")]
     ModelNotImplemented(String),
     #[error("Tokenizer '{0}' is not implemented. Create a new issue in 'https://github.com/gabrielmbmb/candle-holder' to request the implementation.")]

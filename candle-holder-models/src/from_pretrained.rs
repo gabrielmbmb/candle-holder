@@ -13,6 +13,7 @@ use hf_hub::{
 use serde::{Deserialize, Serialize};
 
 use candle_holder::{
+    get_repo_api,
     utils::from_pretrained::{load_model_config, FromPretrainedParameters, MODEL_CONFIG_FILE},
     Error, Result,
 };
@@ -193,20 +194,7 @@ pub fn from_pretrained<I: AsRef<str>>(
     repo_id: I,
     params: Option<FromPretrainedParameters>,
 ) -> Result<ModelInfo> {
-    let params = params.unwrap_or_default();
-
-    let repo = Repo::with_revision(
-        repo_id.as_ref().to_string(),
-        RepoType::Model,
-        params.revision,
-    );
-
-    let mut builder = ApiBuilder::new();
-    if let Some(token) = params.auth_token {
-        builder = builder.with_token(Some(token));
-    }
-    let api = builder.build()?;
-    let api = api.repo(repo);
+    let api = get_repo_api(repo_id.as_ref(), params)?;
 
     // Get the model configuration from `config.json`
     let config = match api.get(MODEL_CONFIG_FILE) {

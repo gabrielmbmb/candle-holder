@@ -1,6 +1,7 @@
 use std::{collections::HashMap, fs};
 
 use candle_holder::{
+    get_repo_api,
     utils::from_pretrained::{load_model_config, FromPretrainedParameters, MODEL_CONFIG_FILE},
     Result,
 };
@@ -414,16 +415,7 @@ pub fn from_pretrained<I: AsRef<str>>(
     repo_id: I,
     params: Option<FromPretrainedParameters>,
 ) -> Result<TokenizerInfo> {
-    let params = params.unwrap_or_default();
-
-    let repo = Repo::with_revision(
-        repo_id.as_ref().to_string(),
-        RepoType::Model,
-        params.revision,
-    );
-
-    let api = Api::new()?;
-    let api = api.repo(repo);
+    let api = get_repo_api(repo_id.as_ref(), params)?;
 
     let tokenizer_config = match api.get(TOKENIZER_CONFIG_FILE) {
         Ok(tokenizer_config_file) => {
