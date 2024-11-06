@@ -41,8 +41,7 @@ pub fn get_repo_api(repo_id: &str, params: Option<FromPretrainedParameters>) -> 
     let repo = Repo::with_revision(repo_id.to_string(), RepoType::Model, params.revision);
     let api = Api::new()?.repo(repo);
 
-    // Check if the repository exists
-    if api.info().is_err() {
+    if api.info().is_err() && api.get(MODEL_CONFIG_FILE).is_err() {
         return Err(Error::RepositoryNotFound(repo_id.to_string()));
     }
 
