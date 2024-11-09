@@ -6,7 +6,7 @@ pub mod models;
 pub mod utils;
 
 pub use config::{PretrainedConfig, ProblemType};
-pub use generation::{GenerationConfig, TextStreamer, TokenStreamer};
+pub use generation::{GenerationConfig, TextStreamer, TokenStreamer, TextIteratorStreamer};
 pub use model::{
     AutoModel, AutoModelForCausalLM, AutoModelForMaskedLM, AutoModelForSequenceClassification,
     AutoModelForTokenClassification, ForwardParams, GenerationParams, PreTrainedModel,

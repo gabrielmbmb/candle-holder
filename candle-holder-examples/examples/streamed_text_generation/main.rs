@@ -4,10 +4,12 @@ extern crate accelerate_src;
 #[cfg(feature = "mkl")]
 extern crate intel_mkl_src;
 
+use std::sync::{Arc, Mutex};
+
 use anyhow::{Error, Result};
 use candle_holder_examples::Cli;
 use candle_holder_models::{
-    AutoModelForCausalLM, GenerationConfig, GenerationParams, TextStreamer, TokenStreamer,
+    AutoModelForCausalLM, GenerationConfig, GenerationParams, TextStreamer, TokenStreamer, TextIteratorStreamer
 };
 use candle_holder_tokenizers::{AutoTokenizer, Message};
 use clap::Parser;
@@ -73,6 +75,12 @@ fn main() -> Result<()> {
         args.apply_chat_template,
         true,
     ));
+
+    // let token_streamer: Box<dyn TokenStreamer> = Box::new(TextIteratorStreamer::new(
+    //     &tokenizer,
+    //     args.apply_chat_template,
+    //     true,
+    // ));
 
     let input_ids = encodings.get_input_ids();
     model.generate(
