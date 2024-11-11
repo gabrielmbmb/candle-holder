@@ -22,6 +22,7 @@ use super::config::{HiddenAct, LlamaConfig};
 
 pub const LLAMA_DTYPE: DType = DType::F16;
 
+#[derive(Debug)]
 pub struct LlamaRotaryEmbedding {
     inv_freq: Tensor,
     scaling_factor: Option<f64>,
@@ -67,6 +68,7 @@ impl LlamaRotaryEmbedding {
     }
 }
 
+#[derive(Debug)]
 pub struct LlamaAttention {
     q_proj: Linear,
     k_proj: Linear,
@@ -194,6 +196,7 @@ impl LlamaAttention {
     }
 }
 
+#[derive(Debug)]
 pub struct HiddenActLayer {
     act: HiddenAct,
 }
@@ -210,6 +213,7 @@ impl HiddenActLayer {
     }
 }
 
+#[derive(Debug)]
 pub struct LlamaMLP {
     gate_proj: Linear,
     up_proj: Linear,
@@ -253,6 +257,7 @@ impl LlamaMLP {
     }
 }
 
+#[derive(Debug)]
 pub struct LlamaDecoderLayer {
     self_attn: LlamaAttention,
     mlp: LlamaMLP,
@@ -314,6 +319,7 @@ impl LlamaDecoderLayer {
     }
 }
 
+#[derive(Debug)]
 pub struct Llama {
     embed_tokens: Embedding,
     layers: Vec<LlamaDecoderLayer>,
@@ -385,6 +391,7 @@ impl Llama {
     }
 }
 
+#[derive(Debug)]
 pub struct LlamaModel {
     model: Llama,
     config: LlamaConfig,
@@ -407,6 +414,7 @@ impl PreTrainedModel for LlamaModel {
     }
 }
 
+#[derive(Debug)]
 pub struct LlamaForCausalLM {
     model: Llama,
     lm_head: Linear,

@@ -15,6 +15,7 @@ use crate::{
 
 pub const BERT_DTYPE: DType = DType::F32;
 
+#[derive(Debug)]
 pub struct HiddenActLayer {
     act: HiddenAct,
 }
@@ -32,6 +33,7 @@ impl HiddenActLayer {
     }
 }
 
+#[derive(Debug)]
 pub struct BertEmbeddings {
     pub word_embeddings: Arc<Embedding>,
     pub position_embeddings: Option<Embedding>,
@@ -88,6 +90,7 @@ impl BertEmbeddings {
     }
 }
 
+#[derive(Debug)]
 pub struct BertSelfAttention {
     query: Linear,
     key: Linear,
@@ -152,6 +155,7 @@ impl BertSelfAttention {
     }
 }
 
+#[derive(Debug)]
 pub struct BertSelfOutput {
     dense: Linear,
     layer_norm: LayerNorm,
@@ -185,6 +189,7 @@ impl BertSelfOutput {
     }
 }
 
+#[derive(Debug)]
 pub struct BertAttention {
     self_attention: BertSelfAttention,
     self_output: BertSelfOutput,
@@ -211,6 +216,7 @@ impl BertAttention {
     }
 }
 
+#[derive(Debug)]
 pub struct BertIntermediate {
     dense: Linear,
     intermediate_act: HiddenActLayer,
@@ -234,6 +240,7 @@ impl Module for BertIntermediate {
     }
 }
 
+#[derive(Debug)]
 pub struct BertOutput {
     dense: Linear,
     layer_norm: LayerNorm,
@@ -267,6 +274,7 @@ impl BertOutput {
     }
 }
 
+#[derive(Debug)]
 pub struct BertLayer {
     attention: BertAttention,
     intermediate: BertIntermediate,
@@ -299,6 +307,7 @@ impl BertLayer {
     }
 }
 
+#[derive(Debug)]
 pub struct BertEncoder {
     layers: Vec<BertLayer>,
 }
@@ -324,6 +333,7 @@ impl BertEncoder {
     }
 }
 
+#[derive(Debug)]
 pub struct BertPooler {
     dense: Linear,
 }
@@ -343,6 +353,7 @@ impl Module for BertPooler {
     }
 }
 
+#[derive(Debug)]
 pub struct BertPredictionHeadTransform {
     dense: Linear,
     transform_act_fn: HiddenActLayer,
@@ -374,6 +385,7 @@ impl Module for BertPredictionHeadTransform {
     }
 }
 
+#[derive(Debug)]
 pub struct BertLMPredictionHead {
     transform: BertPredictionHeadTransform,
     // The decoder weights are tied with the embeddings weights so the model only learns one
@@ -408,6 +420,7 @@ impl Module for BertLMPredictionHead {
     }
 }
 
+#[derive(Debug)]
 pub struct BertOnlyMLMHead {
     predictions: BertLMPredictionHead,
 }
@@ -429,6 +442,7 @@ impl Module for BertOnlyMLMHead {
     }
 }
 
+#[derive(Debug)]
 pub struct Bert {
     embeddings: BertEmbeddings,
     encoder: BertEncoder,
@@ -481,6 +495,7 @@ impl Bert {
     }
 }
 
+#[derive(Debug)]
 pub struct BertModel {
     model: Bert,
     config: BertConfig,
@@ -512,6 +527,7 @@ impl PreTrainedModel for BertModel {
     }
 }
 
+#[derive(Debug)]
 pub struct BertForSequenceClassification {
     model: Bert,
     dropout: Dropout,
@@ -561,6 +577,7 @@ impl PreTrainedModel for BertForSequenceClassification {
     }
 }
 
+#[derive(Debug)]
 pub struct BertForTokenClassification {
     model: Bert,
     dropout: Dropout,
@@ -611,6 +628,7 @@ impl PreTrainedModel for BertForTokenClassification {
     }
 }
 
+#[derive(Debug)]
 pub struct BertForMaskedLM {
     model: Bert,
     cls: BertOnlyMLMHead,

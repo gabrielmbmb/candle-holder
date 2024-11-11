@@ -3,7 +3,7 @@ use candle_holder::{Error, FromPretrainedParameters, Result};
 use candle_holder_models::{AutoModelForTokenClassification, ForwardParams, PreTrainedModel};
 use candle_holder_tokenizers::{AutoTokenizer, BatchEncoding, Padding, PaddingOptions, Tokenizer};
 use serde::Deserialize;
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 use tokenizers::Encoding;
 
 #[derive(Debug, Clone)]
@@ -112,7 +112,7 @@ fn substring(s: &str, start: usize, end: usize) -> String {
 /// A pipeline for token classification.
 pub struct TokenClassificationPipeline {
     model: Box<dyn PreTrainedModel>,
-    tokenizer: Box<dyn Tokenizer>,
+    tokenizer: Arc<dyn Tokenizer>,
     device: Device,
     id2label: HashMap<usize, String>,
 }

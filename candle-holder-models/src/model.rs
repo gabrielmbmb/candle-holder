@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use candle_core::{DType, Device, Tensor};
 use candle_holder::{utils::from_pretrained::FromPretrainedParameters, Error, Result};
 use candle_holder_tokenizers::Tokenizer;
@@ -88,25 +90,25 @@ impl<'a> From<&'a candle_holder_tokenizers::BatchEncoding> for ForwardParams<'a>
 }
 
 /// Parameters for the `generate` method of a `PreTrainedModel`.
-pub struct GenerationParams<'a> {
+pub struct GenerationParams {
     /// The generation configuration to use. If not provided, then the model's default generation
     /// configuration in `generation_config.json` will be used. If that is not available, then
     /// default generation configuration will be used. The default value is `None`.
     pub generation_config: Option<GenerationConfig>,
     /// The tokenizer to use for decoding the generated tokens. It's not extrictly required, but
     /// some stopping criteria may depend on it. The default value is `None`.
-    pub tokenizer: Option<&'a Box<dyn Tokenizer>>,
+    pub tokenizer: Option<Arc<dyn Tokenizer>>,
     /// The list of stopping criteria to use that will determine when to stop generating tokens.
     /// The default value is `None`.
     pub stopping_criteria: Option<Vec<Box<dyn StoppingCriteria>>>,
     /// The token streamer which will receive the next tokens as they are being generated. The
     /// default value is `None`.
-    pub token_streamer: Option<Box<dyn TokenStreamer<'a> + 'a>>,
+    pub token_streamer: Option<Box<dyn TokenStreamer>>,
     /// A seed that will be used in the sampling of the next token. The default value is `None`.
     pub seed: Option<u64>,
 }
 
-impl Default for GenerationParams<'_> {
+impl Default for GenerationParams {
     fn default() -> Self {
         Self {
             generation_config: None,
@@ -155,7 +157,7 @@ impl ModelOutput {
 }
 
 /// Trait for a pre-trained model.
-pub trait PreTrainedModel: Send + Sync {
+pub trait PreTrainedModel: std::fmt::Debug + Send + Sync {
     /// Loads a model from a `VarBuilder` containing the model's parameters and a model
     /// configuration.
     ///
@@ -231,10 +233,10 @@ pub trait PreTrainedModel: Send + Sync {
     /// # Returns
     ///
     /// A vector containing vectors of token ids for each input sequence.
-    fn generate<'a>(
+    fn generate(
         &self,
         input_ids: &Tensor,
-        params: GenerationParams<'a>,
+        params: GenerationParams,
     ) -> Result<Vec<GenerateOutput>> {
         let (mut generation_config, used_model_generation_config) = match params.generation_config {
             Some(config) => (config, false),

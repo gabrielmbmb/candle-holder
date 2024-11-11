@@ -5,7 +5,6 @@ use candle_holder::{
     utils::from_pretrained::{load_model_config, FromPretrainedParameters, MODEL_CONFIG_FILE},
     Result,
 };
-use hf_hub::{api::sync::Api, Repo, RepoType};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Deserializer, Serialize};
 use tokenizers::{

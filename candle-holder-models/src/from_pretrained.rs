@@ -6,10 +6,7 @@ use std::{
 
 use candle_core::{DType, Device};
 use candle_nn::VarBuilder;
-use hf_hub::{
-    api::sync::{ApiBuilder, ApiRepo},
-    Repo, RepoType,
-};
+use hf_hub::api::sync::ApiRepo;
 use serde::{Deserialize, Serialize};
 
 use candle_holder::{
@@ -185,7 +182,7 @@ fn load_model_weights(api: &ApiRepo) -> Result<(Vec<PathBuf>, bool)> {
 /// # Arguments
 ///
 /// * `repo_id`: The Hugging Face Hub model repository id.
-/// * `params`:
+/// * `params` - Optional parameters to specify the revision, user agent, and auth token.
 ///
 /// # Returns
 ///
@@ -194,6 +191,7 @@ pub fn from_pretrained<I: AsRef<str>>(
     repo_id: I,
     params: Option<FromPretrainedParameters>,
 ) -> Result<ModelInfo> {
+    // TODO: check if `repo_id` is a local path
     let api = get_repo_api(repo_id.as_ref(), params)?;
 
     // Get the model configuration from `config.json`

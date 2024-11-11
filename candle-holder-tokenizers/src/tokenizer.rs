@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use candle_core::{DType, Device, Tensor};
 use candle_holder::{Error, FromPretrainedParameters, Result};
 use tokenizers::{
@@ -462,16 +464,16 @@ macro_rules! impl_auto_tokenizer_from_pretrained_method {
                 repo_id: S,
                 padding_side: Option<PaddingSide>,
                 params: Option<FromPretrainedParameters>
-            ) -> Result<Box<dyn Tokenizer>> {
+            ) -> Result<Arc<dyn Tokenizer>> {
                 let tokenizer_info = from_pretrained(repo_id, params)?;
                 let tokenizer_class = tokenizer_info.get_tokenizer_class();
 
-                let tokenizer: Result<Box<dyn Tokenizer>> = match tokenizer_class {
+                let tokenizer: Result<Arc<dyn Tokenizer>> = match tokenizer_class {
                     $(
                         $tokenizer_class => {
                             $tokenizer_builder_struct::new(tokenizer_info, padding_side)
                                 .build()
-                                .map(|tokenizer| Box::new(tokenizer) as Box<dyn Tokenizer>)
+                                .map(|tokenizer| Arc::new(tokenizer) as Arc<dyn Tokenizer>)
                         }
                     )*
                     _ => Err(Error::TokenizerNotImplemented(tokenizer_class.to_string())),
@@ -492,11 +494,11 @@ macro_rules! impl_tokenizer_from_pretrained_method {
                 repo_id: S,
                 padding_side: Option<PaddingSide>,
                 params: Option<FromPretrainedParameters>,
-            ) -> Result<Box<dyn Tokenizer>> {
+            ) -> Result<Arc<dyn Tokenizer>> {
                 let tokenizer_info = from_pretrained(repo_id, params)?;
                 let tokenizer =
                     $tokenizer_builder_struct::new(tokenizer_info, padding_side).build()?;
-                Ok(Box::new(tokenizer))
+                Ok(Arc::new(tokenizer))
             }
         }
     };

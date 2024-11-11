@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use candle_holder::{Error, Result};
 use candle_holder_tokenizers::Tokenizer;
 
@@ -40,14 +42,14 @@ impl StoppingCriteria for EosTokenStoppingCriteria {
 }
 
 /// Stopping criteria that stops generation when a stop string is generated.
-pub struct StopStringStoppingCriteria<'a> {
+pub struct StopStringStoppingCriteria {
     /// The stop strings to check for.
     stop_strings: Vec<String>,
     /// The tokenizer to use to decode the input token IDs.
-    tokenizer: Option<&'a Box<dyn Tokenizer>>,
+    tokenizer: Option<Arc<dyn Tokenizer>>,
 }
 
-impl<'a> StopStringStoppingCriteria<'a> {
+impl StopStringStoppingCriteria {
     /// Creates a new `StopStringStoppingCriteria` with the provided stop strings.
     ///
     /// # Arguments
@@ -58,7 +60,7 @@ impl<'a> StopStringStoppingCriteria<'a> {
     /// # Returns
     ///
     /// A new `StopStringStoppingCriteria`.
-    pub fn new(stop_strings: Vec<String>, tokenizer: Option<&'a Box<dyn Tokenizer>>) -> Self {
+    pub fn new(stop_strings: Vec<String>, tokenizer: Option<Arc<dyn Tokenizer>>) -> Self {
         Self {
             stop_strings,
             tokenizer,
@@ -66,9 +68,9 @@ impl<'a> StopStringStoppingCriteria<'a> {
     }
 }
 
-impl StoppingCriteria for StopStringStoppingCriteria<'_> {
+impl StoppingCriteria for StopStringStoppingCriteria {
     fn should_stop(&self, input_ids: &[u32]) -> Result<bool> {
-        if let Some(tokenizer) = self.tokenizer {
+        if let Some(tokenizer) = self.tokenizer.as_ref() {
             let input_str = tokenizer.decode(input_ids, true)?;
             Ok(self
                 .stop_strings
@@ -103,7 +105,7 @@ impl<'a> StoppingCriteriaApplier<'a> {
     pub fn from_configuration(
         configuration: &GenerationConfig,
         stopping_criteria: Option<Vec<Box<dyn StoppingCriteria>>>,
-        tokenizer: Option<&'a Box<dyn Tokenizer>>,
+        tokenizer: Option<Arc<dyn Tokenizer>>,
     ) -> Result<Self> {
         let mut stopping_criteria = stopping_criteria.unwrap_or_else(|| vec![]);
 

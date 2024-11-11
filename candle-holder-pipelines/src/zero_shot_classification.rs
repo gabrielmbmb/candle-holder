@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use candle_core::{DType, Device, IndexOp, Tensor, D};
 use candle_holder::{Error, FromPretrainedParameters, Result};
 use candle_holder_models::{AutoModelForSequenceClassification, ForwardParams, PreTrainedModel};
@@ -24,7 +26,7 @@ impl Default for ZeroShotClassificationOptions {
 /// A pipeline for doing zero-shot classification.
 pub struct ZeroShotClassificationPipeline {
     model: Box<dyn PreTrainedModel>,
-    tokenizer: Box<dyn Tokenizer>,
+    tokenizer: Arc<dyn Tokenizer>,
     device: Device,
     num_labels: usize,
     entailment_id: i8,

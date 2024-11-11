@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use candle_core::{DType, Device, Tensor, D};
 use candle_holder::{Error, FromPretrainedParameters, Result};
 use candle_holder_models::{AutoModelForMaskedLM, ForwardParams, PreTrainedModel};
@@ -19,7 +21,7 @@ impl Default for FillMaskOptions {
 /// A pipeline for filling masked tokens in a sentence.
 pub struct FillMaskPipeline {
     model: Box<dyn PreTrainedModel>,
-    tokenizer: Box<dyn Tokenizer>,
+    tokenizer: Arc<dyn Tokenizer>,
     device: Device,
 }
 

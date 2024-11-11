@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use candle_core::{DType, Device, Tensor, D};
 use candle_holder::{Error, FromPretrainedParameters, Result};
 use candle_holder_models::{
@@ -9,7 +11,7 @@ use candle_nn::ops::{sigmoid, softmax};
 /// A pipeline for doing text classification.
 pub struct TextClassificationPipeline {
     model: Box<dyn PreTrainedModel>,
-    tokenizer: Box<dyn Tokenizer>,
+    tokenizer: Arc<dyn Tokenizer>,
     device: Device,
 }
 

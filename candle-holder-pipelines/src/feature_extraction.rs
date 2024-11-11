@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use candle_core::{DType, Device, IndexOp, Tensor, D};
 use candle_holder::{FromPretrainedParameters, Result};
 use candle_holder_models::{AutoModel, ForwardParams, PreTrainedModel};
@@ -35,7 +37,7 @@ impl Default for FeatureExtractionOptions {
 /// A pipeline for generating sentence embeddings from input texts.
 pub struct FeatureExtractionPipeline {
     model: Box<dyn PreTrainedModel>,
-    tokenizer: Box<dyn Tokenizer>,
+    tokenizer: Arc<dyn Tokenizer>,
     device: Device,
 }
 

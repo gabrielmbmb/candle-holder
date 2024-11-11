@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use candle_core::{IndexOp, Tensor};
 use candle_holder::{Error, Result};
 use candle_holder_tokenizers::Tokenizer;
@@ -31,13 +33,13 @@ impl GenerateOutput {
 /// # Returns
 ///
 /// A vector containing vectors of token ids for each input sequence.
-pub fn generate<'a, M: PreTrainedModel + ?Sized>(
+pub fn generate<M: PreTrainedModel + ?Sized>(
     model: &M,
     input_ids: &Tensor,
     generation_config: &GenerationConfig,
-    tokenizer: Option<&Box<dyn Tokenizer>>,
+    tokenizer: Option<Arc<dyn Tokenizer>>,
     stopping_criteria: Option<Vec<Box<dyn StoppingCriteria>>>,
-    mut token_streamer: Option<Box<dyn TokenStreamer<'a> + 'a>>,
+    mut token_streamer: Option<Box<dyn TokenStreamer>>,
     seed: Option<u64>,
 ) -> Result<Vec<GenerateOutput>> {
     let num_return_sequences = generation_config.get_num_return_sequences().max(1);

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use candle_core::{DType, Device, Tensor};
 use candle_holder::{FromPretrainedParameters, Result};
 use candle_holder_models::{
@@ -78,7 +80,7 @@ impl TextGenerationPipelineOutput {
 /// A pipeline for generating text with a causal language model.
 pub struct TextGenerationPipeline {
     model: Box<dyn PreTrainedModel>,
-    tokenizer: Box<dyn Tokenizer>,
+    tokenizer: Arc<dyn Tokenizer>,
     device: Device,
 }
 
