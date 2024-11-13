@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use candle_core::{IndexOp, Tensor};
 use candle_holder::{Error, Result};
@@ -39,7 +39,7 @@ pub fn generate<M: PreTrainedModel + ?Sized>(
     generation_config: &GenerationConfig,
     tokenizer: Option<Arc<dyn Tokenizer>>,
     stopping_criteria: Option<Vec<Box<dyn StoppingCriteria>>>,
-    mut token_streamer: Option<Box<dyn TokenStreamer>>,
+    mut token_streamer: Option<Arc<Mutex<dyn TokenStreamer>>>,
     seed: Option<u64>,
 ) -> Result<Vec<GenerateOutput>> {
     let num_return_sequences = generation_config.get_num_return_sequences().max(1);
@@ -143,18 +143,18 @@ pub fn generate<M: PreTrainedModel + ?Sized>(
 }
 
 fn stream_tokens(
-    token_streamer: &mut Option<Box<dyn TokenStreamer + '_>>,
+    token_streamer: &mut Option<Arc<Mutex<dyn TokenStreamer>>>,
     tokens: &[Vec<u32>],
 ) -> Result<()> {
-    if let Some(streamer) = token_streamer.as_mut() {
-        streamer.put(tokens)?;
+    if let Some(streamer) = token_streamer {
+        streamer.lock().unwrap().put(tokens)?;
     }
     Ok(())
 }
 
-fn stream_end(token_streamer: &mut Option<Box<dyn TokenStreamer + '_>>) -> Result<()> {
+fn stream_end(token_streamer: &mut Option<Arc<Mutex<dyn TokenStreamer>>>) -> Result<()> {
     if let Some(streamer) = token_streamer.as_mut() {
-        streamer.end()?;
+        streamer.lock().unwrap().end()?;
     }
     Ok(())
 }

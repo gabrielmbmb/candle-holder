@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use candle_core::{DType, Device, Tensor};
 use candle_holder::{utils::from_pretrained::FromPretrainedParameters, Error, Result};
@@ -103,9 +103,43 @@ pub struct GenerationParams {
     pub stopping_criteria: Option<Vec<Box<dyn StoppingCriteria>>>,
     /// The token streamer which will receive the next tokens as they are being generated. The
     /// default value is `None`.
-    pub token_streamer: Option<Box<dyn TokenStreamer>>,
+    pub token_streamer: Option<Arc<Mutex<dyn TokenStreamer>>>,
     /// A seed that will be used in the sampling of the next token. The default value is `None`.
     pub seed: Option<u64>,
+}
+
+impl GenerationParams {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_generation_config(mut self, generation_config: GenerationConfig) -> Self {
+        self.generation_config = Some(generation_config);
+        self
+    }
+
+    pub fn with_tokenizer(mut self, tokenizer: Arc<dyn Tokenizer>) -> Self {
+        self.tokenizer = Some(tokenizer);
+        self
+    }
+
+    pub fn with_stopping_criteria(
+        mut self,
+        stopping_criteria: Vec<Box<dyn StoppingCriteria>>,
+    ) -> Self {
+        self.stopping_criteria = Some(stopping_criteria);
+        self
+    }
+
+    pub fn with_token_streamer(mut self, token_streamer: Arc<Mutex<dyn TokenStreamer>>) -> Self {
+        self.token_streamer = Some(token_streamer);
+        self
+    }
+
+    pub fn with_seed(mut self, seed: u64) -> Self {
+        self.seed = Some(seed);
+        self
+    }
 }
 
 impl Default for GenerationParams {

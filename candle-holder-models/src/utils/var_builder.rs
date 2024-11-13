@@ -68,9 +68,7 @@ impl CompatibilityTensorRetrievalBackend {
         }
 
         // Try removing the model name prefix
-        let without_prefix = name
-            .strip_prefix(&format!("{}.", self.model_name))
-            .unwrap_or(name);
+        let without_prefix = name.strip_prefix(&self.model_name).unwrap_or(name);
 
         // Function to replace weight/bias with beta/gamma
         let replace_weight_bias = |s: &str| s.replace("weight", "gamma").replace("bias", "beta");
