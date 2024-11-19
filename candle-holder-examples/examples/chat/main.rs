@@ -75,6 +75,10 @@ fn main() -> Result<()> {
             let prompt = message.unwrap();
             messages.push(Message::user(prompt));
 
+            // let prompt = tokenizer
+            //     .apply_chat_template(messages.clone(), true)
+            //     .unwrap();
+
             let mut encodings = tokenizer
                 .apply_chat_template_and_encode(messages.clone(), true)
                 .map_err(Error::msg)
